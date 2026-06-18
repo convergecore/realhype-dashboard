@@ -1,6 +1,6 @@
-# REALHYPE COMMAND OS 2026
+# ConvergeLABS Command OS
 
-Central operacional em Streamlit para CRM, vendas, pedidos CTT, stock, financeiro, Growth, alertas e BI da RealHype.
+Business Intelligence & Operations Control Center da ConvergeLABS, com o workspace RealHype para Direct Commerce, Instagram Sales e CTT Portugal.
 
 ## Deploy e segurança
 
@@ -23,8 +23,8 @@ Para autenticação local, crie seu arquivo de Secrets a partir do exemplo ignor
 
 ## Perfis
 
-- `partner`: acesso completo a operação, produtos, financeiro, Growth, alertas e configurações.
-- `sdr`: Command Center limitado, Leads/CRM, Vendas, CTT/Pedidos, Stock operacional e Alertas.
+- `partner`: acesso completo a Pulse, Sell, Ship, Stock, Growth, Intel, produtos, alertas e Config.
+- `sdr`: Pulse limitado, Sell, Vendas, Ship, Stock operacional e Alertas.
 
 As permissões são verificadas no app antes de ações sensíveis; ocultar um menu não é tratado como controle de acesso suficiente.
 
@@ -85,7 +85,7 @@ WhatsApp/Instagram oficiais quando viável, relatórios diários e follow-up aut
 
 Migração para Next.js, Tailwind e shadcn/ui; autenticação profissional, API backend, logs centralizados e RBAC forte.
 
-### Fase 5 — AI Operating Layer
+### Fase 5 — ConvergeLABS AI Layer
 
 Recomendações automáticas, previsão de demanda, priorização de leads, detecção de risco CTT e copiloto SDR.
 

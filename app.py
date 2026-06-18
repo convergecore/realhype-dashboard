@@ -12,106 +12,119 @@ import streamlit as st
 from sqlalchemy import create_engine, text
 from sqlalchemy.engine import Engine
 
-APP_NAME = "REALHYPE OS"
+APP_NAME = "ConvergeLABS Command OS"
+PLATFORM_NAME = "ConvergeLABS"
+WORKSPACE_NAME = "RealHype"
+PRODUCT_SUBTITLE = "Business Intelligence & Operations Control Center"
+VERTICAL_NAME = "Direct Commerce / Instagram Sales / CTT Portugal"
 DEFAULT_DB_URL = "sqlite:///realhype_local.db"
 
 # -----------------------------
 # Visual
 # -----------------------------
-st.set_page_config(page_title="REALHYPE Control Center", page_icon="⚡", layout="wide")
+st.set_page_config(page_title=APP_NAME, page_icon="◆", layout="wide")
 
 CUSTOM_CSS = """
 <style>
 :root {
-  --bg: #090B10; --sidebar: #05070B; --surface: #11141B; --surface-2: #171B24;
-  --surface-3: #1C2230; --border: #252B36; --border-soft: rgba(148,163,184,.16);
-  --text: #F8FAFC; --muted: #94A3B8; --muted-2: #64748B; --gold: #D6B25E;
-  --gold-soft: rgba(214,178,94,.12); --cyan: #22D3EE; --cyan-soft: rgba(34,211,238,.10);
-  --green: #22C55E; --yellow: #F59E0B; --red: #EF4444; --radius: 12px; --radius-sm: 8px;
-  --rh-bg: var(--bg); --rh-card: var(--surface); --rh-card-2: var(--surface-2);
-  --rh-gold: var(--gold); --rh-gold-light: #E4C77D; --rh-cyan: var(--cyan);
-  --rh-text: #F8FAFC;
-  --rh-muted: #94A3B8;
-  --rh-danger: #FF5C72;
-  --rh-success: #35D07F;
+  --canvas: #0A0A0C; --surface-1: #111114; --surface-2: #18181D; --surface-3: #1F1F26;
+  --hairline: #2A2A35; --text-primary: #F0F0F5; --text-secondary: #9CA3AF; --text-muted: #6B7280;
+  --accent: #F5C542; --accent-hover: #FFD76A; --accent-soft: rgba(245,197,66,.14);
+  --accent-border: rgba(245,197,66,.28); --success: #22C55E; --warning: #F59E0B;
+  --danger: #EF4444; --info: #38BDF8; --radius: 10px; --radius-sm: 7px;
+  --bg: var(--canvas); --sidebar: var(--canvas); --surface: var(--surface-1); --border: var(--hairline);
+  --text: var(--text-primary); --muted: var(--text-secondary); --muted-2: var(--text-muted);
+  --gold: var(--accent); --gold-soft: var(--accent-soft); --green: var(--success); --yellow: var(--warning); --red: var(--danger);
+  --rh-bg: var(--canvas); --rh-card: var(--surface-1); --rh-card-2: var(--surface-2);
+  --rh-gold: var(--accent); --rh-gold-light: var(--accent-hover); --rh-cyan: var(--info);
+  --rh-text: var(--text-primary); --rh-muted: var(--text-secondary); --rh-danger: var(--danger); --rh-success: var(--success);
 }
 html, body, [data-testid="stAppViewContainer"], .stApp {
   background: var(--rh-bg);
   color: var(--rh-text);
 }
-[data-testid="stHeader"] { background: rgba(9,11,16,.92); backdrop-filter: blur(12px); }
+[data-testid="stHeader"] { background: rgba(10,10,12,.94); backdrop-filter: blur(12px); }
 [data-testid="stToolbar"], footer { visibility: hidden; }
-.block-container { max-width: 1480px; padding: 1.5rem 2rem 3rem; }
+.block-container { max-width: 1480px; padding: 1.2rem 2rem 3rem; }
 [data-testid="stSidebar"] {
   background: var(--sidebar);
-  border-right: 1px solid rgba(212,175,55,.18);
+  border-right: 1px solid var(--hairline);
 }
-[data-testid="stSidebar"] [data-testid="stMarkdownContainer"] p { color: #CBD5E1; }
+[data-testid="stSidebar"] [data-testid="stMarkdownContainer"] p { color: var(--text-secondary); }
 [data-testid="stSidebar"] [role="radiogroup"] label {
-  border-radius: 10px;
-  padding: .35rem .55rem;
+  border-radius: var(--radius-sm);
+  padding: .3rem .5rem;
   transition: all .2s ease;
 }
 [data-testid="stSidebar"] [role="radiogroup"] label:hover {
-  background: rgba(0,229,255,.07);
+  background: var(--surface-2);
+  color: var(--text-primary);
 }
-h1, h2, h3 { color: #F8FAFC; letter-spacing: .02em; }
-h2, h3 { border-bottom: 1px solid rgba(212,175,55,.13); padding-bottom: .55rem; }
-.rh-brand { font-size: 1.15rem; font-weight: 900; letter-spacing: .14em; color: var(--rh-gold-light); }
-.rh-eyebrow { margin: 0 0 .35rem; color: var(--rh-cyan); font-size: .72rem; font-weight: 800; letter-spacing: .18em; text-transform: uppercase; }
+[data-testid="stSidebar"] [role="radiogroup"] label:has(input:checked) {
+  background: var(--accent-soft); color: var(--accent-hover); box-shadow: inset 2px 0 var(--accent);
+}
+h1, h2, h3 { color: var(--text-primary); letter-spacing: -.01em; }
+h2, h3 { border-bottom: 1px solid var(--hairline); padding-bottom: .5rem; }
+.rh-brand { font-size: 1.05rem; font-weight: 850; letter-spacing: .1em; color: var(--text-primary); }
+.rh-brand span { color: var(--accent); }
+.rh-eyebrow { margin: 0 0 .3rem; color: var(--accent); font-size: .68rem; font-weight: 800; letter-spacing: .15em; text-transform: uppercase; }
 .rh-hero {
   position: relative;
   overflow: hidden;
-  border: 1px solid rgba(212,175,55,.32);
-  background: radial-gradient(circle at 88% 15%, rgba(0,229,255,.15), transparent 30%),
-              linear-gradient(135deg, rgba(212,175,55,.13), rgba(17,24,39,.97) 48%, rgba(8,10,15,.98));
+  border: 1px solid var(--accent-border);
+  background: linear-gradient(135deg, var(--accent-soft), var(--surface-1) 42%, var(--canvas));
   border-radius: var(--radius);
-  padding: 1.2rem 1.35rem;
-  box-shadow: 0 10px 30px rgba(0,0,0,.24), inset 0 1px 0 rgba(255,255,255,.04);
+  padding: 1rem 1.15rem;
+  box-shadow: 0 10px 28px rgba(0,0,0,.22), inset 0 1px 0 rgba(255,255,255,.03);
 }
-.rh-title { color: #FFF; font-size: clamp(1.45rem, 2.4vw, 2rem); font-weight: 800; letter-spacing: -.01em; margin: 0; }
-.rh-title span { color: var(--rh-gold-light); }
-.rh-subtitle { color: var(--rh-muted); font-size: .88rem; margin: .45rem 0 .9rem; }
+.rh-title { color: var(--text-primary); font-size: clamp(1.3rem, 2.2vw, 1.8rem); font-weight: 800; letter-spacing: -.025em; margin: 0; }
+.rh-title span { color: var(--accent); }
+.rh-subtitle { color: var(--text-secondary); font-size: .82rem; margin: .35rem 0 .75rem; }
 .rh-chip {
   display: inline-block; padding: .28rem .62rem; margin: 0 .35rem .25rem 0;
-  border-radius: 999px; border: 1px solid rgba(0,229,255,.30);
-  background: rgba(0,229,255,.055); color: #7EEBFA; font-size: .7rem;
+  border-radius: 999px; border: 1px solid var(--accent-border);
+  background: var(--accent-soft); color: var(--accent-hover); font-size: .68rem;
 }
 .rh-section { margin: 1.35rem 0 .5rem; color: var(--rh-gold-light); font-size: .76rem; font-weight: 800; letter-spacing: .14em; text-transform: uppercase; }
 .rh-form-card {
-  border: 1px solid rgba(212,175,55,.18); border-radius: 16px; padding: .35rem 1rem 1rem;
-  background: linear-gradient(180deg, rgba(18,21,31,.96), rgba(11,14,21,.98));
+  border: 1px solid var(--hairline); border-radius: var(--radius); padding: .3rem .9rem .9rem;
+  background: var(--surface-1);
 }
-.rh-alert { border-left: 3px solid var(--rh-gold); padding: .8rem 1rem; border-radius: 10px; background: rgba(212,175,55,.075); }
-.rh-user { border: 1px solid rgba(0,229,255,.16); background: rgba(0,229,255,.045); border-radius: 12px; padding: .7rem .85rem; margin: .8rem 0 1rem; }
+.rh-alert { border-left: 3px solid var(--accent); padding: .75rem .9rem; border-radius: var(--radius-sm); background: var(--accent-soft); }
+.rh-user { border: 1px solid var(--hairline); background: var(--surface-1); border-radius: var(--radius); padding: .65rem .8rem; margin: .75rem 0 .9rem; }
+.rh-ai-layer { display:flex; align-items:center; justify-content:space-between; gap:1rem; margin:.2rem 0 1rem; padding:.7rem .85rem; border:1px solid var(--accent-border); border-radius:var(--radius); background:var(--surface-1); }
+.rh-ai-layer strong { color:var(--text-primary); font-size:.78rem; }
+.rh-ai-layer span { color:var(--text-secondary); font-size:.72rem; }
+.rh-ai-layer .rh-ai-name { color:var(--accent); font-weight:800; letter-spacing:.06em; text-transform:uppercase; }
 .small-muted { color: var(--rh-muted); font-size: .75rem; }
 [data-testid="stMetric"] {
-  min-height: 104px; padding: .8rem .9rem; border: 1px solid var(--border);
+  min-height: 96px; padding: .72rem .82rem; border: 1px solid var(--hairline);
   border-radius: var(--radius); background: var(--surface);
-  box-shadow: 0 6px 18px rgba(0,0,0,.16);
+  box-shadow: inset 2px 0 var(--accent-border), 0 6px 16px rgba(0,0,0,.14);
 }
-[data-testid="stMetric"]:hover { border-color: rgba(0,229,255,.32); transform: translateY(-1px); }
-[data-testid="stMetricLabel"] { color: #94A3B8; }
-[data-testid="stMetricValue"] { color: #FFF; font-weight: 800; }
-.stButton > button, .stFormSubmitButton > button {
-  border: 1px solid #C5A252 !important; border-radius: var(--radius-sm) !important; color: #090B10 !important; font-weight: 700 !important;
-  background: var(--gold) !important; box-shadow: none; transition: all .18s ease;
+[data-testid="stMetric"]:hover { border-color: var(--accent-border); transform: translateY(-1px); }
+[data-testid="stMetricLabel"] { color: var(--text-secondary); }
+[data-testid="stMetricValue"] { color: var(--text-primary); font-weight: 800; }
+.stButton > button, .stFormSubmitButton > button, .stDownloadButton > button {
+  border: 1px solid var(--accent) !important; border-radius: var(--radius-sm) !important; color: var(--canvas) !important; font-weight: 750 !important;
+  background: var(--accent) !important; box-shadow: none; transition: all .18s ease;
 }
-.stButton > button:hover, .stFormSubmitButton > button:hover { transform: translateY(-1px); box-shadow: 0 9px 24px rgba(212,175,55,.28); }
-[data-testid="stDataFrame"] { border: 1px solid rgba(0,229,255,.12); border-radius: 14px; overflow: hidden; }
-[data-baseweb="tab-list"] { gap: .35rem; border-bottom: 1px solid rgba(212,175,55,.15); }
+.stButton > button:hover, .stFormSubmitButton > button:hover, .stDownloadButton > button:hover { background: var(--accent-hover) !important; transform: translateY(-1px); box-shadow: 0 8px 22px rgba(245,197,66,.2); }
+.stLinkButton a, a { color: var(--accent) !important; }
+[data-testid="stDataFrame"] { border: 1px solid var(--hairline); border-radius: var(--radius); overflow: hidden; }
+[data-baseweb="tab-list"] { gap: .35rem; border-bottom: 1px solid var(--hairline); }
 [data-baseweb="tab"] { border-radius: 9px 9px 0 0; }
 [data-baseweb="input"], [data-baseweb="select"] > div, textarea {
-  background: #0D111A !important; border-color: rgba(148,163,184,.18) !important;
+  background: var(--surface-2) !important; border-color: var(--hairline) !important;
 }
-hr { border-color: rgba(148,163,184,.11) !important; }
+hr { border-color: var(--hairline) !important; }
 .rh-badge { display:inline-flex; padding:.16rem .48rem; border-radius:999px; font-size:.72rem; font-weight:700; border:1px solid var(--border); }
 .rh-badge-green { color:#86EFAC; background:rgba(34,197,94,.10); }
 .rh-badge-yellow { color:#FCD34D; background:rgba(245,158,11,.10); }
 .rh-badge-red { color:#FCA5A5; background:rgba(239,68,68,.10); }
 .rh-empty { padding:1.3rem; border:1px dashed var(--border); border-radius:var(--radius); background:var(--surface); color:var(--muted); }
 .rh-empty b { color:var(--text); }
-*:focus-visible { outline:2px solid var(--cyan) !important; outline-offset:2px; }
+*:focus-visible { outline:2px solid var(--accent) !important; outline-offset:2px; }
 @media (max-width: 768px) { .block-container { padding: 1rem .85rem 2rem; } .rh-hero { padding: 1.2rem; } }
 </style>
 """
@@ -435,9 +448,10 @@ def login() -> bool:
         return True
     st.markdown("""
     <div class="rh-hero">
-      <p class="rh-title">REALHYPE OS</p>
-      <p class="rh-subtitle">Painel operacional para stock, leads, vendas e decisões críticas.</p>
-      <span class="rh-chip">Direct</span><span class="rh-chip">CTT</span><span class="rh-chip">Street Luxury</span>
+      <p class="rh-eyebrow">ConvergeLABS</p>
+      <p class="rh-title">ConvergeLABS <span>Command OS</span></p>
+      <p class="rh-subtitle">Business Intelligence &amp; Operations Control Center</p>
+      <span class="rh-chip">Workspace: RealHype</span><span class="rh-chip">Direct Commerce</span><span class="rh-chip">CTT Portugal</span>
     </div>
     """, unsafe_allow_html=True)
     st.write("")
@@ -815,13 +829,19 @@ def update_order_ctt(order_id: int, text_confirmed: bool, address_validated: boo
 # Sidebar
 # -----------------------------
 with st.sidebar:
-    st.markdown('<div class="rh-brand">REALHYPE COMMAND OS</div><div class="small-muted">2026 · <span class="rh-badge rh-badge-green">LIVE OPS</span></div>', unsafe_allow_html=True)
+    st.markdown('<div class="rh-brand">CONVERGE<span>LABS</span></div><div class="small-muted">COMMAND OS · Workspace RealHype</div><div class="small-muted"><span class="rh-badge rh-badge-green">AO VIVO</span></div>', unsafe_allow_html=True)
     st.markdown(f'<div class="rh-user"><b>{SAFE_DISPLAY_NAME}</b><br><span class="small-muted">PERFIL · {SAFE_ROLE}</span></div>', unsafe_allow_html=True)
-    partner_pages = ["Command Center", "Leads / CRM", "Vendas", "CTT / Pedidos", "Stock", "Produtos", "Financeiro", "Growth", "Alertas", "Configurações"]
-    sdr_pages = ["Command Center", "Leads / CRM", "Vendas", "CTT / Pedidos", "Stock", "Alertas"]
-    if st.session_state.get("page") == "Visão Geral":
+    partner_pages = ["Command Center", "Leads / CRM", "CTT / Pedidos", "Stock", "Growth", "Financeiro", "Configurações", "Vendas", "Produtos", "Alertas"]
+    sdr_pages = ["Command Center", "Leads / CRM", "CTT / Pedidos", "Stock", "Vendas", "Alertas"]
+    nav_labels = {
+        "Command Center": "Pulse", "Leads / CRM": "Sell", "CTT / Pedidos": "Ship",
+        "Stock": "Stock", "Growth": "Growth", "Financeiro": "Intel", "Configurações": "Config",
+        "Vendas": "Vendas", "Produtos": "Produtos", "Alertas": "Alertas",
+    }
+    allowed_pages = partner_pages if IS_PARTNER else sdr_pages
+    if st.session_state.get("page") == "Visão Geral" or st.session_state.get("page") not in allowed_pages:
         st.session_state["page"] = "Command Center"
-    page = st.radio("NAVEGAÇÃO", partner_pages if IS_PARTNER else sdr_pages, key="page")
+    page = st.radio("NAVEGAÇÃO", allowed_pages, key="page", format_func=lambda item: nav_labels.get(item, item))
     st.divider()
     command = st.selectbox("IR PARA / EXECUTAR", ["Selecionar ação", "Novo lead", "Nova venda", "Movimento de stock", "Ver pedidos CTT", "Ver stock crítico", "Ver financeiro"], key="command_palette")
     command_pages = {"Novo lead":"Leads / CRM", "Nova venda":"Vendas", "Movimento de stock":"Stock", "Ver pedidos CTT":"CTT / Pedidos", "Ver stock crítico":"Stock", "Ver financeiro":"Financeiro"}
@@ -829,7 +849,7 @@ with st.sidebar:
         st.session_state.pop("last_command", None)
     elif command in command_pages and st.session_state.get("last_command") != command:
         target = command_pages[command]
-        if target in (partner_pages if IS_PARTNER else sdr_pages):
+        if target in allowed_pages:
             st.session_state["last_command"] = command
             st.session_state["page"] = target
             st.rerun()
@@ -840,7 +860,7 @@ with st.sidebar:
         st.selectbox("Canal", ["Todos", "Instagram", "WhatsApp", "Outro"], key="global_channel")
         st.text_input("Responsável", key="global_owner")
     st.divider()
-    st.caption(f"● Neon conectado\n\nAtualizado {datetime.now(TZ).strftime('%d/%m %H:%M')}\n\nv2026.1")
+    st.caption(f"● Ao Vivo\n\nAtualizado {datetime.now(TZ).strftime('%d/%m %H:%M')}\n\nConvergeLABS · v2026.1")
     if st.button("Sair", width="stretch"):
         st.session_state.clear()
         st.rerun()
@@ -852,10 +872,10 @@ header_left, header_search, header_right = st.columns([4, 2, 1])
 with header_left:
     st.markdown(f"""
 <div class="rh-hero">
-  <p class="rh-eyebrow">Operations intelligence</p>
-  <p class="rh-title">REALHYPE <span>CONTROL CENTER</span></p>
-  <p class="rh-subtitle">Olá, {SAFE_DISPLAY_NAME}. Visibilidade operacional, CRM, vendas e stock num único painel.</p>
-  <span class="rh-chip">{SAFE_ROLE}</span><span class="rh-chip">NEON CONNECTED</span><span class="rh-chip">LIVE OPERATIONS</span>
+  <p class="rh-eyebrow">Business Intelligence &amp; Operations Control Center</p>
+  <p class="rh-title">ConvergeLABS <span>Command OS</span></p>
+  <p class="rh-subtitle">Direct Commerce / Instagram Sales / CTT Portugal</p>
+  <span class="rh-chip">Workspace: RealHype</span><span class="rh-chip">Ao Vivo</span><span class="rh-chip">{SAFE_DISPLAY_NAME} · {SAFE_ROLE}</span>
 </div>
 """, unsafe_allow_html=True)
 with header_right:
@@ -864,14 +884,20 @@ with header_right:
     if st.button("↻ Atualizar painel", width="stretch"):
         st.rerun()
 with header_search:
-    st.text_input("Busca global", placeholder="Lead, pedido ou SKU...", key="global_search")
+    st.text_input("Command palette", placeholder="Buscar lead, pedido, SKU ou ação...", key="global_search")
 st.write("")
+st.markdown("""
+<div class="rh-ai-layer">
+  <div><span class="rh-ai-name">ConvergeLABS AI Layer</span><br><strong>Assistência operacional baseada em sinais</strong></div>
+  <span>Sugestões heurísticas; nenhuma ação é executada automaticamente.</span>
+</div>
+""", unsafe_allow_html=True)
 
 # -----------------------------
 # Pages
 # -----------------------------
 if page == "Command Center":
-    page_topbar("Command Center", "Decisões prioritárias da operação em tempo real.", "Revisar alertas")
+    page_topbar("Pulse", "Decisões prioritárias da operação em tempo real.", "Revisar alertas")
     today_filter = "DATE(created_at)=CURRENT_DATE" if not get_db_url().startswith("sqlite") else "DATE(created_at)=DATE('now')"
     order_today_filter = "DATE(o.created_at)=CURRENT_DATE" if not get_db_url().startswith("sqlite") else "DATE(o.created_at)=DATE('now')"
     leads_today = scalar(f"SELECT COUNT(*) FROM leads WHERE {today_filter}")
@@ -921,7 +947,7 @@ if page == "Command Center":
         health_cols[3].metric("Base do forecast", f"{forecast['days']} dias")
 
 elif page == "Leads / CRM":
-    page_topbar("Leads / CRM", "Fila operacional do SDR, prioridades e próximas ações.", "Novo lead")
+    page_topbar("Sell", "Fila operacional do SDR, prioridades e próximas ações.", "Novo lead")
     stage_counts = query_df("SELECT stage,COUNT(*) AS total FROM leads GROUP BY stage")
     count_map = dict(zip(stage_counts["stage"], stage_counts["total"])) if not stage_counts.empty else {}
     lead_cards = st.columns(4)
@@ -1042,7 +1068,7 @@ elif page == "Vendas":
     export_csv_button(orders, "realhype_vendas.csv")
 
 elif page == "CTT / Pedidos":
-    page_topbar("CTT / Pedidos", "Validação de envio à cobrança e prevenção de devoluções.", "Atualizar pedido")
+    page_topbar("Ship", "Validação de envio à cobrança e prevenção de devoluções.", "Atualizar pedido")
     total_orders = safe_int(scalar("SELECT COUNT(*) FROM orders"))
     awaiting = safe_int(scalar("SELECT COUNT(*) FROM orders WHERE confirmation_status='pendente' OR text_confirmed=0"))
     sent = safe_int(scalar("SELECT COUNT(*) FROM orders WHERE ctt_status='enviado'"))
@@ -1109,7 +1135,7 @@ elif page == "Stock":
             st.info("Nenhum produto cadastrado.")
         else:
             def color_stock_row(row):
-                colors = {"OK": "background-color: rgba(53,208,127,.10); color: #B7F7D2", "baixo": "background-color: rgba(212,175,55,.12); color: #F2D675", "zerado": "background-color: rgba(255,92,114,.12); color: #FF9AAA"}
+                colors = {"OK": "background-color: rgba(34,197,94,.10); color: #86EFAC", "baixo": "background-color: rgba(245,197,66,.14); color: #FFD76A", "zerado": "background-color: rgba(239,68,68,.12); color: #FCA5A5"}
                 return [colors.get(row["Status"], "") for _ in row]
             st.dataframe(products.style.apply(color_stock_row, axis=1), width="stretch", hide_index=True)
         export_csv_button(products, "realhype_stock.csv")
@@ -1178,7 +1204,7 @@ elif page == "Produtos":
 
 elif page == "Financeiro":
     require_role("partner")
-    page_topbar("Financeiro", "Controladoria simples, margem e inteligência de receita.", "Exportar relatório")
+    page_topbar("Intel", "Controladoria simples, margem e inteligência de receita.", "Exportar relatório")
     metrics = calculate_metrics()
     revenue_brl, cost_brl = metrics["revenue"], metrics["cmv"]
     today_clause = "DATE(created_at)=CURRENT_DATE" if not get_db_url().startswith("sqlite") else "DATE(created_at)=DATE('now')"
@@ -1211,12 +1237,12 @@ elif page == "Financeiro":
         else:
             daily_finance["created_at"] = pd.to_datetime(daily_finance["created_at"],errors="coerce")
             daily_chart = daily_finance.dropna().groupby(daily_finance["created_at"].dt.date)["total_brl"].sum()
-            st.line_chart(daily_chart,color="#D6B25E")
+            st.line_chart(daily_chart,color="#F5C542")
     with chart2:
         st.subheader("Vendas por canal")
         channels = query_df("SELECT channel,COUNT(*) AS vendas FROM orders WHERE status IN ('confirmado','preparando envio','enviado','entregue') GROUP BY channel")
         if channels.empty: empty_state("Sem atribuição", "As vendas por canal aparecerão aqui.")
-        else: st.bar_chart(channels.set_index("channel"),color="#22D3EE")
+        else: st.bar_chart(channels.set_index("channel"),color="#F5C542")
 
     with st.expander("BI avançado · ABC, heatmap, cohort e forecast"):
         abc = classify_products_abc(); heatmap = build_heatmap_data(); cohort = build_cohort_data(); forecast = forecast_revenue_30d()
@@ -1288,7 +1314,7 @@ elif page == "Alertas":
 
 elif page == "Configurações":
     require_role("partner")
-    page_topbar("Configurações", "Parâmetros operacionais e governança do Command OS.", "Salvar parâmetros")
+    page_topbar("Config", "Parâmetros operacionais e governança do Command OS.", "Salvar parâmetros")
     current_rate = get_eur_rate()
     setting_values = {row["key"]:row["value"] for _,row in query_df("SELECT key,value FROM settings").iterrows()}
     status_cols=st.columns(4)
