@@ -1,107 +1,88 @@
-﻿# REALHYPE OS â€” Dashboard MVP Gratuito
+# REALHYPE COMMAND OS 2026
 
-Painel operacional gratuito para controlar **stock, leads, mensagens, vendas, CTT e financeiro** da RealHype.
+Central operacional em Streamlit para CRM, vendas, pedidos CTT, stock, financeiro, Growth, alertas e BI da RealHype.
 
-## Estrutura gratuita recomendada
+## Deploy e segurança
 
-- **GitHub**: guardar o cÃ³digo.
-- **Streamlit Community Cloud**: hospedar o dashboard.
-- **Neon Postgres Free**: banco de dados online para acesso dos sÃ³cios e SDR em dispositivos diferentes.
+- Aplicação principal: `app.py`
+- Runtime: Python 3.12
+- Banco: Neon PostgreSQL, configurado exclusivamente em Streamlit Secrets
+- Autenticação: utilizadores e roles `partner`/`sdr` configurados exclusivamente em Secrets
+- Fallback local: SQLite, sem credenciais embutidas
 
-## 1. Criar repositÃ³rio no GitHub
+Nunca versione `.streamlit/secrets.toml`. O código não precisa conhecer nem exibir URL, senha, token ou chave. No Streamlit Community Cloud, selecione `app.py` como arquivo principal e configure os Secrets na interface segura da plataforma.
 
-1. Crie um repositÃ³rio chamado `realhype-dashboard`.
-2. Envie estes arquivos para o repositÃ³rio:
-   - `app.py`
-   - `requirements.txt`
-   - `.gitignore`
-   - `.streamlit/config.toml`
-   - `.streamlit/secrets.toml.example`
-   - `runtime.txt`
-   - `schema.sql`
-
-> NÃ£o envie `.streamlit/secrets.toml` com senha real para o GitHub.
-
-## 2. Criar banco gratuito no Neon
-
-1. Crie uma conta em Neon.
-2. Crie um projeto Postgres.
-3. Copie a connection string do banco.
-4. Ela deve parecer com:
-
-```txt
-postgresql://USER:PASSWORD@HOST.neon.tech/DBNAME?sslmode=require
-```
-
-## 3. Publicar no Streamlit Community Cloud
-
-1. Entre no Streamlit Community Cloud.
-2. Clique em **New app**.
-3. Escolha o repositÃ³rio `realhype-dashboard`.
-4. Main file path: `app.py`.
-5. Antes de publicar, abra **Advanced settings > Secrets**.
-6. Cole o conteÃºdo abaixo, trocando URL e senhas:
-
-```toml
-[database]
-url = "postgresql://USER:PASSWORD@HOST.neon.tech/DBNAME?sslmode=require"
-
-[users.socio1]
-password = "trocar-senha-socio-1"
-role = "partner"
-name = "SÃ³cio 1"
-
-[users.socio2]
-password = "trocar-senha-socio-2"
-role = "partner"
-name = "SÃ³cio 2"
-
-[users.sdr]
-password = "trocar-senha-sdr"
-role = "sdr"
-name = "SDR"
-```
-
-7. Clique em **Deploy**.
-
-## 4. Acesso em tempo real
-
-Depois de publicado, o Streamlit gera um link parecido com:
-
-```txt
-https://realhype-dashboard.streamlit.app
-```
-
-Todos acessam pelo mesmo link:
-
-- SÃ³cio 1: visÃ£o completa.
-- SÃ³cio 2: visÃ£o completa.
-- SDR: cadastro de leads, mensagens, vendas e stock.
-
-Quando alguÃ©m grava um dado, ele vai para o banco Neon. Outros dispositivos veem a atualizaÃ§Ã£o ao clicar em **Atualizar agora** ou ao trocar de pÃ¡gina.
-
-## 5. Como rodar localmente
-
-Instale as dependÃªncias:
+## Execução local
 
 ```bash
 pip install -r requirements.txt
-```
-
-Rode:
-
-```bash
 streamlit run app.py
 ```
 
-Sem secrets configuradas, o app usa banco local SQLite `realhype_local.db`, mas o login exige usuarios definidos em Secrets.
+Para autenticação local, crie seu arquivo de Secrets a partir do exemplo ignorado pelo Git e use apenas valores de desenvolvimento.
 
-Para rodar localmente, crie `.streamlit/secrets.toml` a partir de `.streamlit/secrets.toml.example` e defina senhas fora do Git.
+## Perfis
 
-## 6. PrÃ³ximas melhorias
+- `partner`: acesso completo a operação, produtos, financeiro, Growth, alertas e configurações.
+- `sdr`: Command Center limitado, Leads/CRM, Vendas, CTT/Pedidos, Stock operacional e Alertas.
 
-- Login mais forte com senha criptografada.
-- HistÃ³rico completo por cliente.
-- PÃ¡gina de encomendas CTT com status detalhado.
-- Upload de imagem do produto.
-- AutomaÃ§Ã£o futura com Instagram/WhatsApp oficial.
+As permissões são verificadas no app antes de ações sensíveis; ocultar um menu não é tratado como controle de acesso suficiente.
+
+## Glossário de BI
+
+- Receita: soma das vendas em status operacional válido.
+- CMV: soma de `custo_unitário × quantidade` dos produtos vendidos.
+- Lucro bruto estimado: receita menos CMV.
+- Margem estimada: lucro bruto estimado dividido pela receita.
+- Ticket médio: receita dividida pelo número de vendas válidas.
+- Conversão lead → venda: vendas válidas divididas por leads.
+- Giro de estoque: unidades vendidas divididas pelo estoque médio; depende de histórico suficiente.
+- Stock crítico: unidades menores ou iguais ao mínimo configurado.
+- Taxa de devolução: pedidos devolvidos divididos por pedidos enviados.
+- CAC estimado: investimento em ads dividido por clientes adquiridos.
+- ROAS estimado: receita atribuída dividida pelo investimento em ads.
+- Forecast 30 dias: média diária recente multiplicada por 30; é uma projeção simples.
+- LTV, churn e NPS: placeholders até existir histórico/recorrência/pesquisa adequados.
+
+## Migrações
+
+`ensure_schema()` executa somente operações aditivas e idempotentes:
+
+- cria tabelas ausentes;
+- adiciona colunas ausentes;
+- preserva tabelas e dados existentes;
+- não executa remoção de tabelas.
+
+## Protótipo visual
+
+`prototype/` contém um mock HTML/CSS/JS isolado, explicitamente marcado como DEMO. Ele usa apenas dados fictícios, não acessa Secrets e não conecta ao Neon.
+
+## Roadmap
+
+### Fase 0 — MVP atual
+
+Streamlit + Neon + login simples e operação manual.
+
+### Fase 1 — Command OS operacional
+
+Páginas, KPIs, CRM, stock, vendas e CTT integrados.
+
+### Fase 2 — BI e alertas
+
+ABC/Pareto, forecast, heatmap, cohort e anomalias com histórico crescente.
+
+### Fase 3 — Automações
+
+WhatsApp/Instagram oficiais quando viável, relatórios diários e follow-up automático.
+
+### Fase 4 — SaaS premium
+
+Migração para Next.js, Tailwind e shadcn/ui; autenticação profissional, API backend, logs centralizados e RBAC forte.
+
+### Fase 5 — AI Operating Layer
+
+Recomendações automáticas, previsão de demanda, priorização de leads, detecção de risco CTT e copiloto SDR.
+
+## Limites atuais
+
+O lucro permanece estimado até confirmar custos finais de CTT, embalagem e ads. O login simples via Secrets é adequado ao MVP interno, mas deve migrar para um provedor de identidade e sessões profissionais na fase SaaS.

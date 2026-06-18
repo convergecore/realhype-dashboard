@@ -1,8 +1,11 @@
 ﻿from __future__ import annotations
 
 import os
-from datetime import date
+import html
+import hmac
+from datetime import date, datetime, timedelta
 from typing import Any, Dict, Optional
+from zoneinfo import ZoneInfo
 
 import pandas as pd
 import streamlit as st
@@ -20,12 +23,13 @@ st.set_page_config(page_title="REALHYPE Control Center", page_icon="⚡", layout
 CUSTOM_CSS = """
 <style>
 :root {
-  --rh-bg: #080A0F;
-  --rh-card: #111827;
-  --rh-card-2: #12151F;
-  --rh-gold: #D4AF37;
-  --rh-gold-light: #F2D675;
-  --rh-cyan: #00E5FF;
+  --bg: #090B10; --sidebar: #05070B; --surface: #11141B; --surface-2: #171B24;
+  --surface-3: #1C2230; --border: #252B36; --border-soft: rgba(148,163,184,.16);
+  --text: #F8FAFC; --muted: #94A3B8; --muted-2: #64748B; --gold: #D6B25E;
+  --gold-soft: rgba(214,178,94,.12); --cyan: #22D3EE; --cyan-soft: rgba(34,211,238,.10);
+  --green: #22C55E; --yellow: #F59E0B; --red: #EF4444; --radius: 12px; --radius-sm: 8px;
+  --rh-bg: var(--bg); --rh-card: var(--surface); --rh-card-2: var(--surface-2);
+  --rh-gold: var(--gold); --rh-gold-light: #E4C77D; --rh-cyan: var(--cyan);
   --rh-text: #F8FAFC;
   --rh-muted: #94A3B8;
   --rh-danger: #FF5C72;
@@ -35,10 +39,11 @@ html, body, [data-testid="stAppViewContainer"], .stApp {
   background: var(--rh-bg);
   color: var(--rh-text);
 }
-[data-testid="stHeader"] { background: rgba(8,10,15,.82); }
+[data-testid="stHeader"] { background: rgba(9,11,16,.92); backdrop-filter: blur(12px); }
+[data-testid="stToolbar"], footer { visibility: hidden; }
 .block-container { max-width: 1480px; padding: 1.5rem 2rem 3rem; }
 [data-testid="stSidebar"] {
-  background: linear-gradient(180deg, #0A0D14 0%, #080A0F 100%);
+  background: var(--sidebar);
   border-right: 1px solid rgba(212,175,55,.18);
 }
 [data-testid="stSidebar"] [data-testid="stMarkdownContainer"] p { color: #CBD5E1; }
@@ -60,11 +65,11 @@ h2, h3 { border-bottom: 1px solid rgba(212,175,55,.13); padding-bottom: .55rem; 
   border: 1px solid rgba(212,175,55,.32);
   background: radial-gradient(circle at 88% 15%, rgba(0,229,255,.15), transparent 30%),
               linear-gradient(135deg, rgba(212,175,55,.13), rgba(17,24,39,.97) 48%, rgba(8,10,15,.98));
-  border-radius: 20px;
-  padding: 1.55rem 1.75rem;
-  box-shadow: 0 18px 55px rgba(0,0,0,.34), inset 0 1px 0 rgba(255,255,255,.04);
+  border-radius: var(--radius);
+  padding: 1.2rem 1.35rem;
+  box-shadow: 0 10px 30px rgba(0,0,0,.24), inset 0 1px 0 rgba(255,255,255,.04);
 }
-.rh-title { color: #FFF; font-size: clamp(1.65rem, 3vw, 2.45rem); font-weight: 900; letter-spacing: .055em; margin: 0; }
+.rh-title { color: #FFF; font-size: clamp(1.45rem, 2.4vw, 2rem); font-weight: 800; letter-spacing: -.01em; margin: 0; }
 .rh-title span { color: var(--rh-gold-light); }
 .rh-subtitle { color: var(--rh-muted); font-size: .88rem; margin: .45rem 0 .9rem; }
 .rh-chip {
@@ -81,17 +86,16 @@ h2, h3 { border-bottom: 1px solid rgba(212,175,55,.13); padding-bottom: .55rem; 
 .rh-user { border: 1px solid rgba(0,229,255,.16); background: rgba(0,229,255,.045); border-radius: 12px; padding: .7rem .85rem; margin: .8rem 0 1rem; }
 .small-muted { color: var(--rh-muted); font-size: .75rem; }
 [data-testid="stMetric"] {
-  min-height: 126px; padding: 1rem 1.05rem; border: 1px solid rgba(212,175,55,.16);
-  border-radius: 15px; background: linear-gradient(145deg, rgba(17,24,39,.98), rgba(12,15,23,.98));
-  box-shadow: 0 10px 28px rgba(0,0,0,.22);
+  min-height: 104px; padding: .8rem .9rem; border: 1px solid var(--border);
+  border-radius: var(--radius); background: var(--surface);
+  box-shadow: 0 6px 18px rgba(0,0,0,.16);
 }
 [data-testid="stMetric"]:hover { border-color: rgba(0,229,255,.32); transform: translateY(-1px); }
 [data-testid="stMetricLabel"] { color: #94A3B8; }
 [data-testid="stMetricValue"] { color: #FFF; font-weight: 800; }
 .stButton > button, .stFormSubmitButton > button {
-  border: 0 !important; border-radius: 10px !important; color: #090B10 !important; font-weight: 800 !important;
-  background: linear-gradient(135deg, #B88A20 0%, #F2D675 52%, #C69B2D 100%) !important;
-  box-shadow: 0 7px 20px rgba(212,175,55,.17); transition: all .18s ease;
+  border: 1px solid #C5A252 !important; border-radius: var(--radius-sm) !important; color: #090B10 !important; font-weight: 700 !important;
+  background: var(--gold) !important; box-shadow: none; transition: all .18s ease;
 }
 .stButton > button:hover, .stFormSubmitButton > button:hover { transform: translateY(-1px); box-shadow: 0 9px 24px rgba(212,175,55,.28); }
 [data-testid="stDataFrame"] { border: 1px solid rgba(0,229,255,.12); border-radius: 14px; overflow: hidden; }
@@ -101,19 +105,29 @@ h2, h3 { border-bottom: 1px solid rgba(212,175,55,.13); padding-bottom: .55rem; 
   background: #0D111A !important; border-color: rgba(148,163,184,.18) !important;
 }
 hr { border-color: rgba(148,163,184,.11) !important; }
+.rh-badge { display:inline-flex; padding:.16rem .48rem; border-radius:999px; font-size:.72rem; font-weight:700; border:1px solid var(--border); }
+.rh-badge-green { color:#86EFAC; background:rgba(34,197,94,.10); }
+.rh-badge-yellow { color:#FCD34D; background:rgba(245,158,11,.10); }
+.rh-badge-red { color:#FCA5A5; background:rgba(239,68,68,.10); }
+.rh-empty { padding:1.3rem; border:1px dashed var(--border); border-radius:var(--radius); background:var(--surface); color:var(--muted); }
+.rh-empty b { color:var(--text); }
+*:focus-visible { outline:2px solid var(--cyan) !important; outline-offset:2px; }
 @media (max-width: 768px) { .block-container { padding: 1rem .85rem 2rem; } .rh-hero { padding: 1.2rem; } }
 </style>
 """
-st.markdown(CUSTOM_CSS, unsafe_allow_html=True)
+def inject_css() -> None:
+    st.markdown(CUSTOM_CSS, unsafe_allow_html=True)
+
+
+inject_css()
 
 # -----------------------------
 # Database
 # -----------------------------
 def _normalize_db_url(raw_url: str) -> str:
-    if raw_url.startswith("postgres://"):
-        return raw_url.replace("postgres://", "postgresql+psycopg2://", 1)
-    if raw_url.startswith("postgresql://"):
-        return raw_url.replace("postgresql://", "postgresql+psycopg2://", 1)
+    scheme, separator, remainder = raw_url.partition("://")
+    if separator and scheme in {"postgres", "postgresql"}:
+        return f"postgresql+psycopg2{separator}{remainder}"
     return raw_url
 
 
@@ -333,8 +347,75 @@ def init_db() -> None:
     execute("INSERT INTO settings (key, value) VALUES ('eur_brl', '5.80') ON CONFLICT (key) DO NOTHING" if not get_db_url().startswith("sqlite") else "INSERT OR IGNORE INTO settings (key, value) VALUES ('eur_brl', '5.80')")
 
 
-if os.environ.get("REALHYPE_SKIP_DB_INIT") != "1":
+def _column_exists(table_name: str, column_name: str) -> bool:
+    if get_db_url().startswith("sqlite"):
+        with engine.begin() as conn:
+            columns = conn.execute(text(f"PRAGMA table_info({table_name})")).mappings().all()
+        return any(column["name"] == column_name for column in columns)
+    return bool(scalar("""
+        SELECT COUNT(*) FROM information_schema.columns
+        WHERE table_schema='public' AND table_name=:table_name AND column_name=:column_name
+    """, {"table_name": table_name, "column_name": column_name}))
+
+
+def _ensure_column(table_name: str, column_name: str, definition: str) -> None:
+    allowed_tables = {"products", "leads", "orders", "stock_movements"}
+    if table_name not in allowed_tables or not column_name.replace("_", "").isalnum():
+        raise ValueError("Migração inválida.")
+    if not _column_exists(table_name, column_name):
+        execute(f"ALTER TABLE {table_name} ADD COLUMN {column_name} {definition}")
+
+
+def ensure_schema() -> None:
+    """Migração aditiva, idempotente e sem remoção de dados existentes."""
     init_db()
+    additions = {
+        "leads": {
+            "temperature": "TEXT DEFAULT 'morno'", "urgency": "TEXT DEFAULT 'normal'",
+            "next_action": "TEXT", "next_action_at": "TIMESTAMP", "last_interaction_at": "TIMESTAMP",
+        },
+        "orders": {
+            "channel": "TEXT DEFAULT 'Instagram'", "text_confirmed": "INTEGER DEFAULT 0",
+            "address_validated": "INTEGER DEFAULT 0", "phone_validated": "INTEGER DEFAULT 0",
+            "pickup_deadline": "DATE", "returned": "INTEGER DEFAULT 0", "return_reason": "TEXT",
+        },
+        "products": {
+            "currency": "TEXT DEFAULT 'EUR'", "description": "TEXT", "tags": "TEXT",
+            "warranty_notes": "TEXT", "updated_at": "TIMESTAMP",
+        },
+        "stock_movements": {"notes": "TEXT", "movement_date": "DATE"},
+    }
+    for table_name, columns in additions.items():
+        for column_name, definition in columns.items():
+            _ensure_column(table_name, column_name, definition)
+
+    identity = "INTEGER GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY" if not get_db_url().startswith("sqlite") else "INTEGER PRIMARY KEY AUTOINCREMENT"
+    execute(f"""
+        CREATE TABLE IF NOT EXISTS campaign_metrics (
+            id {identity}, campaign TEXT NOT NULL, creative TEXT, channel TEXT,
+            investment_brl REAL NOT NULL DEFAULT 0, messages_received INTEGER NOT NULL DEFAULT 0,
+            leads_count INTEGER NOT NULL DEFAULT 0, sales_count INTEGER NOT NULL DEFAULT 0,
+            revenue_brl REAL NOT NULL DEFAULT 0, notes TEXT, metric_date DATE NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    execute(f"""
+        CREATE TABLE IF NOT EXISTS audit_logs (
+            id {identity}, actor TEXT, role TEXT, action TEXT NOT NULL, entity_type TEXT,
+            entity_id TEXT, before_data TEXT, after_data TEXT, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    defaults = {
+        "app_version": "2026.1", "default_currency": "BRL", "packaging_cost_brl": "0",
+        "ctt_cost_brl": "0", "daily_revenue_goal_brl": "0", "monthly_sales_goal": "0",
+    }
+    for key, value in defaults.items():
+        sql = "INSERT INTO settings (key,value) VALUES (:key,:value) ON CONFLICT (key) DO NOTHING" if not get_db_url().startswith("sqlite") else "INSERT OR IGNORE INTO settings (key,value) VALUES (:key,:value)"
+        execute(sql, {"key": key, "value": value})
+
+
+if os.environ.get("REALHYPE_SKIP_DB_INIT") != "1":
+    ensure_schema()
 
 # -----------------------------
 # Auth
@@ -366,7 +447,8 @@ def login() -> bool:
         ok = st.form_submit_button("Entrar")
     if ok:
         users = get_users()
-        if username in users and password == users[username].get("password"):
+        stored_password = str(users.get(username, {}).get("password", ""))
+        if username in users and stored_password and hmac.compare_digest(str(password), stored_password):
             st.session_state["auth"] = True
             st.session_state["username"] = username
             st.session_state["role"] = users[username].get("role", "sdr")
@@ -384,6 +466,10 @@ if not login():
 ROLE = str(st.session_state.get("role", "sdr")).lower()
 DISPLAY_NAME = st.session_state.get("display_name", "Usuário")
 IS_PARTNER = ROLE == "partner"
+SAFE_DISPLAY_NAME = html.escape(str(DISPLAY_NAME))
+SAFE_ROLE = html.escape(ROLE.upper())
+TZ = ZoneInfo("America/Sao_Paulo")
+VALID_SALE_STATUSES = {"confirmado", "preparando envio", "enviado", "entregue"}
 
 # -----------------------------
 # Helpers
@@ -403,14 +489,201 @@ def money_brl(v: Any) -> str:
     return f"R$ {float(v or 0):,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
 
 
+def get_conn():
+    return engine.begin()
+
+
+def run_query(sql: str, params: Optional[Dict[str, Any]] = None) -> pd.DataFrame:
+    return query_df(sql, params)
+
+
+def execute_query(sql: str, params: Optional[Dict[str, Any]] = None) -> None:
+    execute(sql, params)
+
+
+def require_role(*allowed_roles: str) -> None:
+    if ROLE not in allowed_roles:
+        st.error("Você não tem permissão para acessar esta área.")
+        st.stop()
+
+
+def log_action(action: str, entity_type: str = "system", entity_id: Any = None, before_data: str = "", after_data: str = "") -> None:
+    execute("""
+        INSERT INTO audit_logs (actor, role, action, entity_type, entity_id, before_data, after_data)
+        VALUES (:actor, :role, :action, :entity_type, :entity_id, :before_data, :after_data)
+    """, {"actor": DISPLAY_NAME, "role": ROLE, "action": action[:120], "entity_type": entity_type[:80], "entity_id": str(entity_id or "")[:80], "before_data": before_data[:2000], "after_data": after_data[:2000]})
+
+
+def money(value: Any, currency: str = "BRL") -> str:
+    return money_brl(value) if currency == "BRL" else money_eur(value)
+
+
+def pct(value: Any) -> str:
+    return f"{safe_float(value):.1f}%".replace(".", ",")
+
+
+def safe_int(value: Any, default: int = 0) -> int:
+    try:
+        return int(value or 0)
+    except (TypeError, ValueError):
+        return default
+
+
+def safe_float(value: Any, default: float = 0.0) -> float:
+    try:
+        return float(value or 0)
+    except (TypeError, ValueError):
+        return default
+
+
+def status_badge(status: str) -> str:
+    normalized = (status or "info").lower()
+    tone = "green" if normalized in {"ok", "cliente", "confirmado", "entregue", "ativo"} else "red" if normalized in {"crítico", "zerado", "devolvido", "cancelado", "perdido"} else "yellow"
+    return f'<span class="rh-badge rh-badge-{tone}">{html.escape(status or "—")}</span>'
+
+
+def priority_badge(priority: str) -> str:
+    return status_badge(priority)
+
+
+def metric_card(label: str, value: Any, delta: Optional[str] = None, help_text: Optional[str] = None) -> None:
+    st.metric(label, value, delta=delta, help=help_text)
+
+
+def page_topbar(title: str, subtitle: str, primary_action: str = "") -> None:
+    left, right = st.columns([5, 2])
+    with left:
+        st.markdown(f"## {title}")
+        st.caption(subtitle)
+    with right:
+        st.caption(datetime.now(TZ).strftime("%d/%m/%Y · %H:%M BRT"))
+        if st.button("Atualizar", key=f"refresh_{title}", width="stretch"):
+            st.rerun()
+    if primary_action:
+        st.caption(f"Ação principal · {primary_action}")
+
+
+def admin_table(data: pd.DataFrame, empty_message: str = "Nenhum registro encontrado.") -> None:
+    if data.empty:
+        empty_state("Sem dados", empty_message)
+    else:
+        st.dataframe(data, width="stretch", hide_index=True)
+
+
+def empty_state(title: str, message: str) -> None:
+    st.markdown(f'<div class="rh-empty"><b>{html.escape(title)}</b><br><span>{html.escape(message)}</span></div>', unsafe_allow_html=True)
+
+
+def export_csv_button(data: pd.DataFrame, filename: str, label: str = "Exportar CSV") -> None:
+    st.download_button(label, data.to_csv(index=False).encode("utf-8-sig"), file_name=filename, mime="text/csv", disabled=data.empty)
+
+
+def calculate_metrics() -> Dict[str, float]:
+    sales = query_df("SELECT total_brl, created_at FROM orders WHERE status IN ('confirmado','preparando envio','enviado','entregue')")
+    items = query_df("SELECT oi.qty, oi.unit_cost_brl FROM order_items oi JOIN orders o ON o.id=oi.order_id WHERE o.status IN ('confirmado','preparando envio','enviado','entregue')")
+    leads_count = safe_int(scalar("SELECT COUNT(*) FROM leads"))
+    revenue = safe_float(sales["total_brl"].sum()) if not sales.empty else 0
+    cmv = safe_float((items["qty"] * items["unit_cost_brl"]).sum()) if not items.empty else 0
+    sales_count = len(sales)
+    return {"revenue": revenue, "cmv": cmv, "profit": revenue - cmv, "margin": ((revenue - cmv) / revenue * 100) if revenue else 0, "ticket": revenue / sales_count if sales_count else 0, "conversion": sales_count / leads_count * 100 if leads_count else 0, "sales_count": sales_count, "leads_count": leads_count}
+
+
+def classify_products_abc() -> pd.DataFrame:
+    data = query_df("""
+        SELECT p.sku, p.name AS produto, COALESCE(SUM(oi.qty * oi.unit_price_eur),0) AS receita_eur
+        FROM products p LEFT JOIN order_items oi ON oi.product_id=p.id
+        LEFT JOIN orders o ON o.id=oi.order_id AND o.status IN ('confirmado','preparando envio','enviado','entregue')
+        GROUP BY p.id,p.sku,p.name ORDER BY receita_eur DESC
+    """)
+    if data.empty or safe_float(data["receita_eur"].sum()) == 0:
+        return pd.DataFrame()
+    data["acumulado_pct"] = data["receita_eur"].cumsum() / data["receita_eur"].sum() * 100
+    data["classe"] = data["acumulado_pct"].apply(lambda value: "A" if value <= 80 else "B" if value <= 95 else "C")
+    return data
+
+
+def forecast_revenue_30d() -> Dict[str, float]:
+    sales = query_df("SELECT total_brl, created_at FROM orders WHERE status IN ('confirmado','preparando envio','enviado','entregue') AND created_at >= CURRENT_TIMESTAMP - INTERVAL '30 days'" if not get_db_url().startswith("sqlite") else "SELECT total_brl, created_at FROM orders WHERE status IN ('confirmado','preparando envio','enviado','entregue') AND created_at >= datetime('now','-30 days')")
+    if sales.empty:
+        return {"daily_average": 0, "forecast_30d": 0, "days": 0}
+    sales["created_at"] = pd.to_datetime(sales["created_at"], errors="coerce")
+    daily = sales.dropna(subset=["created_at"]).groupby(sales["created_at"].dt.date)["total_brl"].sum()
+    average = safe_float(daily.tail(14).mean()) if not daily.empty else 0
+    return {"daily_average": average, "forecast_30d": average * 30, "days": len(daily)}
+
+
+def build_heatmap_data() -> pd.DataFrame:
+    sales = query_df("SELECT created_at, total_brl FROM orders WHERE status IN ('confirmado','preparando envio','enviado','entregue')")
+    if sales.empty:
+        return pd.DataFrame()
+    sales["created_at"] = pd.to_datetime(sales["created_at"], errors="coerce")
+    sales = sales.dropna(subset=["created_at"])
+    if sales.empty:
+        return pd.DataFrame()
+    days = {0:"Seg",1:"Ter",2:"Qua",3:"Qui",4:"Sex",5:"Sáb",6:"Dom"}
+    sales["dia"] = sales["created_at"].dt.dayofweek.map(days)
+    sales["hora"] = sales["created_at"].dt.hour
+    result = sales.pivot_table(index="dia", columns="hora", values="total_brl", aggfunc="sum", fill_value=0)
+    result.columns = result.columns.astype(str)
+    return result
+
+
+def build_cohort_data() -> pd.DataFrame:
+    data = query_df("""
+        SELECT l.id, MIN(o.created_at) AS primeira_compra, COUNT(o.id) AS pedidos, COALESCE(SUM(o.total_brl),0) AS receita_brl
+        FROM leads l JOIN orders o ON o.lead_id=l.id
+        WHERE o.status IN ('confirmado','preparando envio','enviado','entregue') GROUP BY l.id
+    """)
+    if data.empty:
+        return data
+    data["primeira_compra"] = pd.to_datetime(data["primeira_compra"], errors="coerce")
+    data["coorte"] = data["primeira_compra"].dt.to_period("M").astype(str)
+    return data.groupby("coorte", as_index=False).agg(clientes=("id", "count"), pedidos=("pedidos", "sum"), receita_brl=("receita_brl", "sum"))
+
+
+def detect_alerts() -> pd.DataFrame:
+    alerts = []
+    now = datetime.now(TZ).strftime("%d/%m/%Y %H:%M")
+    critical = query_df("SELECT sku,name,quantity,reorder_point FROM products WHERE active=1 AND quantity<=reorder_point ORDER BY quantity")
+    for row in critical.itertuples():
+        severity = "crítico" if safe_int(row.quantity) == 0 else "atenção"
+        alerts.append({"Severidade": severity, "Entidade": row.sku, "Descrição": f"{row.name}: {row.quantity} un. (mínimo {row.reorder_point})", "Ação recomendada": "Repor stock ou pausar oferta", "Data": now})
+    risky_orders = query_df("SELECT id,status,ctt_status FROM orders WHERE status NOT IN ('entregue','cancelado') AND (confirmation_status='pendente' OR ctt_status='devolvido') ORDER BY id DESC LIMIT 50")
+    for row in risky_orders.itertuples():
+        alerts.append({"Severidade": "crítico" if row.ctt_status == "devolvido" else "atenção", "Entidade": f"Pedido #{row.id}", "Descrição": "Devolução CTT" if row.ctt_status == "devolvido" else "Confirmação pendente", "Ação recomendada": "Validar cliente e dados de envio", "Data": now})
+    stale_sql = "SELECT id,name FROM leads WHERE stage NOT IN ('cliente','perdido') AND COALESCE(last_interaction_at,created_at) < CURRENT_TIMESTAMP - INTERVAL '24 hours' LIMIT 50" if not get_db_url().startswith("sqlite") else "SELECT id,name FROM leads WHERE stage NOT IN ('cliente','perdido') AND COALESCE(last_interaction_at,created_at) < datetime('now','-24 hours') LIMIT 50"
+    for row in query_df(stale_sql).itertuples():
+        alerts.append({"Severidade":"atenção","Entidade":f"Lead #{row.id}","Descrição":f"{row.name} está sem interação há mais de 24h","Ação recomendada":"Priorizar follow-up do SDR","Data":now})
+    idle = query_df("SELECT p.sku,p.name FROM products p WHERE p.active=1 AND p.quantity>0 AND NOT EXISTS (SELECT 1 FROM order_items oi WHERE oi.product_id=p.id) LIMIT 30")
+    for row in idle.itertuples():
+        alerts.append({"Severidade":"info","Entidade":row.sku,"Descrição":f"{row.name} possui stock e nenhuma venda registrada","Ação recomendada":"Revisar oferta, criativo ou exposição","Data":now})
+    rate = get_eur_rate()
+    low_margin = query_df("SELECT sku,name,cost_brl,sale_price_eur FROM products WHERE active=1 AND sale_price_eur IS NOT NULL")
+    for row in low_margin.itertuples():
+        margin = safe_float(row.sale_price_eur)*rate-safe_float(row.cost_brl)
+        if margin > 0 and margin < safe_float(row.cost_brl)*0.2:
+            alerts.append({"Severidade":"atenção","Entidade":row.sku,"Descrição":f"{row.name} tem margem bruta estimada abaixo de 20% do custo","Ação recomendada":"Revisar preço ou custo","Data":now})
+    daily_sales = query_df("SELECT created_at,total_brl FROM orders WHERE status IN ('confirmado','preparando envio','enviado','entregue')")
+    if not daily_sales.empty:
+        daily_sales["created_at"] = pd.to_datetime(daily_sales["created_at"],errors="coerce")
+        daily = daily_sales.dropna(subset=["created_at"]).groupby(daily_sales["created_at"].dt.date)["total_brl"].sum()
+        if len(daily) >= 7:
+            baseline = daily.iloc[:-1].tail(14)
+            current = safe_float(daily.iloc[-1])
+            deviation = safe_float(baseline.std())
+            if deviation and abs(current-safe_float(baseline.mean())) > deviation*2:
+                alerts.append({"Severidade":"atenção","Entidade":"Receita","Descrição":"Receita diária fora do padrão recente","Ação recomendada":"Verificar campanha, tracking e operação","Data":now})
+    return pd.DataFrame(alerts)
+
+
 # -----------------------------
 # Data operations
 # -----------------------------
-def add_product(sku: str, name: str, category: str, qty: int, reorder_point: int, cost_brl: float, sale_price_eur: float):
+def add_product(sku: str, name: str, category: str, qty: int, reorder_point: int, cost_brl: float, sale_price_eur: float, currency: str = "EUR", description: str = "", tags: str = "", warranty_notes: str = "", active: int = 1):
     execute(
         """
-        INSERT INTO products (sku, name, category, quantity, reorder_point, cost_brl, sale_price_eur)
-        VALUES (:sku, :name, :category, :quantity, :reorder_point, :cost_brl, :sale_price_eur)
+        INSERT INTO products (sku, name, category, quantity, reorder_point, cost_brl, sale_price_eur, currency, description, tags, warranty_notes, active, updated_at)
+        VALUES (:sku, :name, :category, :quantity, :reorder_point, :cost_brl, :sale_price_eur, :currency, :description, :tags, :warranty_notes, :active, CURRENT_TIMESTAMP)
         ON CONFLICT (sku) DO UPDATE SET
             name = excluded.name,
             category = excluded.category,
@@ -418,10 +691,11 @@ def add_product(sku: str, name: str, category: str, qty: int, reorder_point: int
             reorder_point = excluded.reorder_point,
             cost_brl = excluded.cost_brl,
             sale_price_eur = excluded.sale_price_eur,
-            active = 1
+            currency=excluded.currency, description=excluded.description, tags=excluded.tags,
+            warranty_notes=excluded.warranty_notes, active=excluded.active, updated_at=CURRENT_TIMESTAMP
         """ if not get_db_url().startswith("sqlite") else """
-        INSERT INTO products (sku, name, category, quantity, reorder_point, cost_brl, sale_price_eur)
-        VALUES (:sku, :name, :category, :quantity, :reorder_point, :cost_brl, :sale_price_eur)
+        INSERT INTO products (sku, name, category, quantity, reorder_point, cost_brl, sale_price_eur, currency, description, tags, warranty_notes, active, updated_at)
+        VALUES (:sku, :name, :category, :quantity, :reorder_point, :cost_brl, :sale_price_eur, :currency, :description, :tags, :warranty_notes, :active, CURRENT_TIMESTAMP)
         ON CONFLICT(sku) DO UPDATE SET
             name = excluded.name,
             category = excluded.category,
@@ -429,33 +703,40 @@ def add_product(sku: str, name: str, category: str, qty: int, reorder_point: int
             reorder_point = excluded.reorder_point,
             cost_brl = excluded.cost_brl,
             sale_price_eur = excluded.sale_price_eur,
-            active = 1
+            currency=excluded.currency, description=excluded.description, tags=excluded.tags,
+            warranty_notes=excluded.warranty_notes, active=excluded.active, updated_at=CURRENT_TIMESTAMP
         """,
-        {"sku": sku, "name": name, "category": category, "quantity": qty, "reorder_point": reorder_point, "cost_brl": cost_brl, "sale_price_eur": sale_price_eur},
+        {"sku": sku, "name": name, "category": category, "quantity": qty, "reorder_point": reorder_point, "cost_brl": cost_brl, "sale_price_eur": sale_price_eur, "currency": currency, "description": description, "tags": tags, "warranty_notes": warranty_notes, "active": active},
     )
+    log_action("product_upserted", "product", sku, after_data=f"active={active}; quantity={qty}")
 
 
-def add_lead(name: str, contact: str, ig_handle: str, channel: str, interest: str, stage: str, notes: str):
+def add_lead(name: str, contact: str, ig_handle: str, channel: str, interest: str, stage: str, notes: str, temperature: str = "morno", urgency: str = "normal", next_action: str = "", next_action_at: Optional[date] = None):
     execute(
         """
-        INSERT INTO leads (name, contact, ig_handle, channel, interest, stage, owner, notes)
-        VALUES (:name, :contact, :ig_handle, :channel, :interest, :stage, :owner, :notes)
+        INSERT INTO leads (name, contact, ig_handle, channel, interest, stage, owner, notes, temperature, urgency, next_action, next_action_at)
+        VALUES (:name, :contact, :ig_handle, :channel, :interest, :stage, :owner, :notes, :temperature, :urgency, :next_action, :next_action_at)
         """,
-        {"name": name, "contact": contact, "ig_handle": ig_handle, "channel": channel, "interest": interest, "stage": stage, "owner": DISPLAY_NAME, "notes": notes},
+        {"name": name, "contact": contact, "ig_handle": ig_handle, "channel": channel, "interest": interest, "stage": stage, "owner": DISPLAY_NAME, "notes": notes, "temperature": temperature, "urgency": urgency, "next_action": next_action or None, "next_action_at": str(next_action_at) if next_action_at else None},
     )
+    log_action("lead_created", "lead", after_data=f"status={stage}; canal={channel}")
 
 
 def update_lead_stage(lead_id: int, stage: str):
     execute("UPDATE leads SET stage=:stage, updated_at=CURRENT_TIMESTAMP WHERE id=:id", {"stage": stage, "id": lead_id})
+    log_action("lead_status_updated", "lead", lead_id, after_data=f"status={stage}")
 
 
 def add_message(lead_id: int, direction: str, content: str):
-    execute("INSERT INTO messages (lead_id, direction, content) VALUES (:lead_id, :direction, :content)", {"lead_id": lead_id, "direction": direction, "content": content})
+    with engine.begin() as conn:
+        conn.execute(text("INSERT INTO messages (lead_id, direction, content) VALUES (:lead_id, :direction, :content)"), {"lead_id": lead_id, "direction": direction, "content": content})
+        conn.execute(text("UPDATE leads SET last_interaction_at=CURRENT_TIMESTAMP, updated_at=CURRENT_TIMESTAMP WHERE id=:lead_id"), {"lead_id": lead_id})
+    log_action("message_registered", "lead", lead_id, after_data=f"direction={direction}")
 
 
-def create_order(lead_id: Optional[int], product_id: int, qty: int, unit_price_eur: float, status: str, confirmation_status: str, ctt_status: str, notes: str):
+def create_order(lead_id: Optional[int], product_id: int, qty: int, unit_price_eur: float, status: str, confirmation_status: str, ctt_status: str, notes: str, channel: str = "Instagram"):
     rate = get_eur_rate()
-    stock_statuses = {"confirmado", "enviado", "entregue"}
+    stock_statuses = VALID_SALE_STATUSES
     reduces_stock = status in stock_statuses
     with engine.begin() as conn:
         product_sql = "SELECT quantity, cost_brl FROM products WHERE id=:id"
@@ -471,10 +752,10 @@ def create_order(lead_id: Optional[int], product_id: int, qty: int, unit_price_e
         total_eur = unit_price_eur * qty
         total_brl = total_eur * rate
         insert_order = """
-            INSERT INTO orders (lead_id, status, ctt_status, confirmation_status, total_eur, total_brl, notes, created_by)
-            VALUES (:lead_id, :status, :ctt_status, :confirmation_status, :total_eur, :total_brl, :notes, :created_by)
+            INSERT INTO orders (lead_id, status, ctt_status, confirmation_status, total_eur, total_brl, notes, created_by, channel)
+            VALUES (:lead_id, :status, :ctt_status, :confirmation_status, :total_eur, :total_brl, :notes, :created_by, :channel)
         """
-        params = {"lead_id": lead_id, "status": status, "ctt_status": ctt_status, "confirmation_status": confirmation_status, "total_eur": total_eur, "total_brl": total_brl, "notes": notes, "created_by": DISPLAY_NAME}
+        params = {"lead_id": lead_id, "status": status, "ctt_status": ctt_status, "confirmation_status": confirmation_status, "total_eur": total_eur, "total_brl": total_brl, "notes": notes, "created_by": DISPLAY_NAME, "channel": channel}
         if get_db_url().startswith("sqlite"):
             result = conn.execute(text(insert_order), params)
             order_id = result.lastrowid
@@ -497,10 +778,12 @@ def create_order(lead_id: Optional[int], product_id: int, qty: int, unit_price_e
     return order_id
 
 
-def adjust_stock(product_id: int, movement_type: str, qty: int, reason: str) -> None:
+def adjust_stock(product_id: int, movement_type: str, qty: int, reason: str, notes: str = "") -> None:
     if qty <= 0:
         raise ValueError("A quantidade deve ser maior que zero.")
-    delta = qty if movement_type == "entrada" else -qty
+    if not reason.strip():
+        raise ValueError("O motivo é obrigatório.")
+    delta = qty if movement_type in {"entrada", "ajuste", "devolucao"} else -qty
     with engine.begin() as conn:
         updated = conn.execute(
             text("UPDATE products SET quantity = quantity + :delta WHERE id=:product_id AND quantity + :delta >= 0"),
@@ -510,23 +793,54 @@ def adjust_stock(product_id: int, movement_type: str, qty: int, reason: str) -> 
             raise ValueError("Stock insuficiente para esta saída ou produto não encontrado.")
         conn.execute(
             text("""
-                INSERT INTO stock_movements (product_id, movement_type, qty, reason, user_name)
-                VALUES (:product_id, :movement_type, :qty, :reason, :user_name)
+                INSERT INTO stock_movements (product_id, movement_type, qty, reason, user_name, notes, movement_date)
+                VALUES (:product_id, :movement_type, :qty, :reason, :user_name, :notes, :movement_date)
             """),
-            {"product_id": product_id, "movement_type": movement_type, "qty": delta, "reason": reason.strip() or "Ajuste manual", "user_name": DISPLAY_NAME},
+            {"product_id": product_id, "movement_type": movement_type, "qty": delta, "reason": reason.strip(), "user_name": DISPLAY_NAME, "notes": notes.strip(), "movement_date": str(date.today())},
         )
+    log_action("stock_adjusted", "product", product_id, after_data=f"type={movement_type}; qty={delta}")
+
+
+def update_order_ctt(order_id: int, text_confirmed: bool, address_validated: bool, phone_validated: bool, pickup_deadline: Optional[date], ctt_status: str, returned: bool, return_reason: str, notes: str) -> None:
+    require_role("partner", "sdr")
+    execute("""
+        UPDATE orders SET text_confirmed=:text_confirmed, address_validated=:address_validated,
+            phone_validated=:phone_validated, pickup_deadline=:pickup_deadline, ctt_status=:ctt_status,
+            returned=:returned, return_reason=:return_reason, notes=:notes, updated_at=CURRENT_TIMESTAMP
+        WHERE id=:order_id
+    """, {"text_confirmed": int(text_confirmed), "address_validated": int(address_validated), "phone_validated": int(phone_validated), "pickup_deadline": str(pickup_deadline) if pickup_deadline else None, "ctt_status": ctt_status, "returned": int(returned), "return_reason": return_reason.strip(), "notes": notes.strip(), "order_id": order_id})
+    log_action("ctt_order_updated", "order", order_id, after_data=f"ctt_status={ctt_status}; returned={int(returned)}")
 
 # -----------------------------
 # Sidebar
 # -----------------------------
 with st.sidebar:
-    st.markdown('<div class="rh-brand">REALHYPE</div><div class="small-muted">CONTROL CENTER · ADMIN</div>', unsafe_allow_html=True)
-    st.markdown(f'<div class="rh-user"><b>{DISPLAY_NAME}</b><br><span class="small-muted">PERFIL · {ROLE.upper()}</span></div>', unsafe_allow_html=True)
-    partner_pages = ["Visão Geral", "Leads / CRM", "Vendas", "Stock", "Produtos", "Financeiro", "Configurações"]
-    sdr_pages = ["Visão Geral", "Leads / CRM", "Vendas", "Stock"]
+    st.markdown('<div class="rh-brand">REALHYPE COMMAND OS</div><div class="small-muted">2026 · <span class="rh-badge rh-badge-green">LIVE OPS</span></div>', unsafe_allow_html=True)
+    st.markdown(f'<div class="rh-user"><b>{SAFE_DISPLAY_NAME}</b><br><span class="small-muted">PERFIL · {SAFE_ROLE}</span></div>', unsafe_allow_html=True)
+    partner_pages = ["Command Center", "Leads / CRM", "Vendas", "CTT / Pedidos", "Stock", "Produtos", "Financeiro", "Growth", "Alertas", "Configurações"]
+    sdr_pages = ["Command Center", "Leads / CRM", "Vendas", "CTT / Pedidos", "Stock", "Alertas"]
+    if st.session_state.get("page") == "Visão Geral":
+        st.session_state["page"] = "Command Center"
     page = st.radio("NAVEGAÇÃO", partner_pages if IS_PARTNER else sdr_pages, key="page")
     st.divider()
-    st.caption("RealHype Operations · online")
+    command = st.selectbox("IR PARA / EXECUTAR", ["Selecionar ação", "Novo lead", "Nova venda", "Movimento de stock", "Ver pedidos CTT", "Ver stock crítico", "Ver financeiro"], key="command_palette")
+    command_pages = {"Novo lead":"Leads / CRM", "Nova venda":"Vendas", "Movimento de stock":"Stock", "Ver pedidos CTT":"CTT / Pedidos", "Ver stock crítico":"Stock", "Ver financeiro":"Financeiro"}
+    if command == "Selecionar ação":
+        st.session_state.pop("last_command", None)
+    elif command in command_pages and st.session_state.get("last_command") != command:
+        target = command_pages[command]
+        if target in (partner_pages if IS_PARTNER else sdr_pages):
+            st.session_state["last_command"] = command
+            st.session_state["page"] = target
+            st.rerun()
+        else:
+            st.warning("Ação restrita ao perfil partner.")
+    with st.expander("Filtros globais"):
+        st.selectbox("Período", ["Hoje", "7 dias", "30 dias", "Todo período"], key="global_period")
+        st.selectbox("Canal", ["Todos", "Instagram", "WhatsApp", "Outro"], key="global_channel")
+        st.text_input("Responsável", key="global_owner")
+    st.divider()
+    st.caption(f"● Neon conectado\n\nAtualizado {datetime.now(TZ).strftime('%d/%m %H:%M')}\n\nv2026.1")
     if st.button("Sair", width="stretch"):
         st.session_state.clear()
         st.rerun()
@@ -534,14 +848,14 @@ with st.sidebar:
 # -----------------------------
 # Header
 # -----------------------------
-header_left, header_right = st.columns([6, 1])
+header_left, header_search, header_right = st.columns([4, 2, 1])
 with header_left:
     st.markdown(f"""
 <div class="rh-hero">
   <p class="rh-eyebrow">Operations intelligence</p>
   <p class="rh-title">REALHYPE <span>CONTROL CENTER</span></p>
-  <p class="rh-subtitle">Olá, {DISPLAY_NAME}. Visibilidade operacional, CRM, vendas e stock num único painel.</p>
-  <span class="rh-chip">{ROLE.upper()}</span><span class="rh-chip">NEON CONNECTED</span><span class="rh-chip">LIVE OPERATIONS</span>
+  <p class="rh-subtitle">Olá, {SAFE_DISPLAY_NAME}. Visibilidade operacional, CRM, vendas e stock num único painel.</p>
+  <span class="rh-chip">{SAFE_ROLE}</span><span class="rh-chip">NEON CONNECTED</span><span class="rh-chip">LIVE OPERATIONS</span>
 </div>
 """, unsafe_allow_html=True)
 with header_right:
@@ -549,49 +863,70 @@ with header_right:
     st.write("")
     if st.button("↻ Atualizar painel", width="stretch"):
         st.rerun()
+with header_search:
+    st.text_input("Busca global", placeholder="Lead, pedido ou SKU...", key="global_search")
 st.write("")
 
 # -----------------------------
 # Pages
 # -----------------------------
-if page == "Visão Geral":
-    st.markdown('<div class="rh-section">Pulso da operação</div>', unsafe_allow_html=True)
+if page == "Command Center":
+    page_topbar("Command Center", "Decisões prioritárias da operação em tempo real.", "Revisar alertas")
+    today_filter = "DATE(created_at)=CURRENT_DATE" if not get_db_url().startswith("sqlite") else "DATE(created_at)=DATE('now')"
+    order_today_filter = "DATE(o.created_at)=CURRENT_DATE" if not get_db_url().startswith("sqlite") else "DATE(o.created_at)=DATE('now')"
+    leads_today = scalar(f"SELECT COUNT(*) FROM leads WHERE {today_filter}")
+    sales_today = scalar(f"SELECT COUNT(*) FROM orders WHERE {today_filter} AND status IN ('confirmado','preparando envio','enviado','entregue')")
+    revenue_today = scalar(f"SELECT COALESCE(SUM(total_brl),0) FROM orders WHERE {today_filter} AND status IN ('confirmado','preparando envio','enviado','entregue')")
+    cost_today = scalar(f"SELECT COALESCE(SUM(oi.qty*oi.unit_cost_brl),0) FROM order_items oi JOIN orders o ON o.id=oi.order_id WHERE {order_today_filter} AND o.status IN ('confirmado','preparando envio','enviado','entregue')")
     leads_total = scalar("SELECT COUNT(*) FROM leads")
-    leads_today = scalar("SELECT COUNT(*) FROM leads WHERE DATE(created_at)=CURRENT_DATE" if not get_db_url().startswith("sqlite") else "SELECT COUNT(*) FROM leads WHERE DATE(created_at)=DATE('now')")
-    orders_count = scalar("SELECT COUNT(*) FROM orders WHERE status IN ('confirmado','enviado','entregue')")
-    revenue_eur = scalar("SELECT COALESCE(SUM(total_eur),0) FROM orders WHERE status IN ('confirmado','enviado','entregue')")
-    stock_units = scalar("SELECT COALESCE(SUM(quantity),0) FROM products WHERE active=1")
-    products_in_stock = scalar("SELECT COUNT(*) FROM products WHERE active=1 AND quantity > 0")
+    sales_total = scalar("SELECT COUNT(*) FROM orders WHERE status IN ('confirmado','preparando envio','enviado','entregue')")
+    pending_orders = scalar("SELECT COUNT(*) FROM orders WHERE status NOT IN ('entregue','devolvido','cancelado')")
     low_stock_count = scalar("SELECT COUNT(*) FROM products WHERE active=1 AND quantity <= reorder_point")
-    kpi1, kpi2, kpi3 = st.columns(3)
-    kpi4, kpi5, kpi6 = st.columns(3)
-    kpi1.metric("Leads totais", int(leads_total), help="Todos os contactos do CRM")
-    kpi2.metric("Leads de hoje", int(leads_today), help="Novos contactos no dia")
-    kpi3.metric("Vendas totais", int(orders_count), help="Confirmadas, enviadas ou entregues")
-    kpi4.metric("Faturamento total", money_eur(revenue_eur) if IS_PARTNER else "Restrito", help="Visível integralmente para partner")
-    kpi5.metric("Produtos em stock", int(products_in_stock), delta=f"{int(stock_units)} unidades", delta_color="off")
-    kpi6.metric("Produtos com stock baixo", int(low_stock_count), delta="atenção" if low_stock_count else "saudável", delta_color="inverse" if low_stock_count else "normal")
-
-    overview_left, overview_right = st.columns([1.15, 1])
-    with overview_left:
-        st.subheader("Funil de Leads")
-        funnel = query_df("SELECT stage, COUNT(*) AS total FROM leads GROUP BY stage ORDER BY total DESC")
-        if funnel.empty:
-            st.info("Ainda não há leads registados.")
+    returns = scalar("SELECT COUNT(*) FROM orders WHERE status='devolvido' OR ctt_status='devolvido'")
+    kpis = st.columns(4)
+    kpis2 = st.columns(4)
+    kpis[0].metric("Receita hoje", money_brl(revenue_today) if IS_PARTNER else "Restrito", help="Soma das vendas válidas criadas hoje")
+    kpis[1].metric("Lucro estimado hoje", money_brl(safe_float(revenue_today)-safe_float(cost_today)) if IS_PARTNER else "Restrito", help="Receita hoje menos CMV estimado")
+    kpis[2].metric("Leads hoje", safe_int(leads_today), help="Leads criados no dia")
+    kpis[3].metric("Vendas hoje", safe_int(sales_today), help="Vendas em status operacional válido")
+    kpis2[0].metric("Conversão lead → venda", pct(safe_int(sales_total)/safe_int(leads_total)*100 if leads_total else 0), help="Vendas válidas / leads totais")
+    kpis2[1].metric("Pedidos pendentes", safe_int(pending_orders), help="Pedidos ainda não entregues, devolvidos ou cancelados")
+    kpis2[2].metric("Stock crítico", safe_int(low_stock_count), help="Produtos com unidades abaixo ou iguais ao mínimo")
+    kpis2[3].metric("Devoluções / risco CTT", safe_int(returns), help="Pedidos marcados como devolvidos")
+    alerts = detect_alerts()
+    left, right = st.columns([1.25, 1])
+    with left:
+        st.subheader("Ações recomendadas")
+        if alerts.empty:
+            empty_state("Operação estável", "Nenhuma ação crítica detectada agora.")
         else:
-            st.bar_chart(funnel.set_index("stage"), color="#D4AF37")
-            st.dataframe(funnel, width="stretch", hide_index=True)
-    with overview_right:
-        st.subheader("Alertas de Stock")
-        low = query_df("SELECT sku AS SKU, name AS Produto, quantity AS Unidades, reorder_point AS Mínimo FROM products WHERE active=1 AND quantity <= reorder_point ORDER BY quantity ASC")
-        if low.empty:
-            st.success("Operação saudável: nenhum produto crítico.")
-        else:
-            st.warning("Itens no ponto de reposição ou abaixo dele.")
-            st.dataframe(low, width="stretch", hide_index=True)
+            admin_table(alerts.head(6))
+        st.subheader("Atividade recente")
+        activity = query_df("SELECT created_at AS Data, action AS Ação, actor AS Responsável, entity_type AS Entidade FROM audit_logs ORDER BY id DESC LIMIT 8")
+        admin_table(activity, "As próximas ações registradas aparecerão aqui.")
+    with right:
+        st.subheader("Produtos que merecem atenção")
+        low = query_df('SELECT sku AS "SKU", name AS "Produto", quantity AS "Unidades", reorder_point AS "Mínimo" FROM products WHERE active=1 AND quantity<=reorder_point ORDER BY quantity LIMIT 10')
+        admin_table(low, "Nenhum SKU crítico.")
+        st.subheader("Próximas ações do SDR")
+        next_actions = query_df('SELECT name AS "Lead", urgency AS "Urgência", next_action AS "Próxima ação", next_action_at AS "Quando" FROM leads WHERE next_action IS NOT NULL AND stage NOT IN (\'cliente\',\'perdido\') ORDER BY next_action_at LIMIT 10')
+        admin_table(next_actions, "Nenhuma próxima ação agendada.")
+    with st.expander("Saúde do negócio · BI rápido"):
+        metrics = calculate_metrics()
+        forecast = forecast_revenue_30d()
+        health_cols = st.columns(4)
+        health_cols[0].metric("Margem estimada", pct(metrics["margin"]))
+        health_cols[1].metric("Ticket médio", money_brl(metrics["ticket"]))
+        health_cols[2].metric("Forecast simples 30d", money_brl(forecast["forecast_30d"]), help="Média diária recente × 30")
+        health_cols[3].metric("Base do forecast", f"{forecast['days']} dias")
 
 elif page == "Leads / CRM":
-    st.markdown('<div class="rh-section">CRM · relacionamento e conversão</div>', unsafe_allow_html=True)
+    page_topbar("Leads / CRM", "Fila operacional do SDR, prioridades e próximas ações.", "Novo lead")
+    stage_counts = query_df("SELECT stage,COUNT(*) AS total FROM leads GROUP BY stage")
+    count_map = dict(zip(stage_counts["stage"], stage_counts["total"])) if not stage_counts.empty else {}
+    lead_cards = st.columns(4)
+    for column, stage_name in zip(lead_cards, ["lead", "prospect", "cliente", "perdido"]):
+        column.metric(stage_name.title(), safe_int(count_map.get(stage_name, 0)))
     tab1, tab2, tab3 = st.tabs(["Novo lead", "Pipeline & leads", "Mensagens"])
     with tab1:
         with st.container(border=True):
@@ -604,17 +939,36 @@ elif page == "Leads / CRM":
                 channel = row2.selectbox("Canal", ["Instagram", "WhatsApp", "Outro"])
                 interest = row1.selectbox("Interesse", ["Cordão fino", "Cordão médio", "Presença forte", "Pingente", "Presente", "Não definido"])
                 stage = row2.selectbox("Status", ["lead", "prospect", "cliente", "perdido"])
+                temperature = row1.selectbox("Temperatura", ["frio", "morno", "quente"])
+                urgency = row2.selectbox("Urgência", ["normal", "atenção", "urgente"])
+                next_action = row1.text_input("Próxima ação", placeholder="Responder, enviar catálogo, confirmar dados...")
+                next_action_at = row2.date_input("Data da próxima ação", value=date.today())
                 notes = st.text_area("Observação")
                 if st.form_submit_button("Registrar lead"):
                     if not name.strip():
                         st.error("Informe o nome do lead.")
                     else:
-                        add_lead(name.strip(), contact.strip(), ig.strip(), channel, interest, stage, notes.strip())
+                        add_lead(name.strip(), contact.strip(), ig.strip(), channel, interest, stage, notes.strip(), temperature, urgency, next_action.strip(), next_action_at)
                         st.success("Lead registado.")
                         st.rerun()
     with tab2:
-        leads = query_df('SELECT id AS "ID", name AS "Nome", contact AS "Contacto", ig_handle AS "Instagram", channel AS "Canal", stage AS "Status", interest AS "Interesse", notes AS "Observação", created_at AS "Criado_em" FROM leads ORDER BY id DESC')
-        st.dataframe(leads, width="stretch", hide_index=True)
+        filter_cols = st.columns(5)
+        filter_status = filter_cols[0].selectbox("Status", ["Todos", "lead", "prospect", "cliente", "perdido"], key="lead_filter_status")
+        filter_channel = filter_cols[1].selectbox("Canal", ["Todos", "Instagram", "WhatsApp", "Outro"], key="lead_filter_channel")
+        filter_urgency = filter_cols[2].selectbox("Urgência", ["Todos", "normal", "atenção", "urgente"], key="lead_filter_urgency")
+        filter_owner = filter_cols[3].text_input("Responsável", key="lead_filter_owner")
+        search_lead = filter_cols[4].text_input("Buscar", key="lead_search")
+        leads = query_df('SELECT id AS "ID", name AS "Nome", contact AS "Contato", ig_handle AS "Instagram", channel AS "Canal", stage AS "Status", urgency AS "Urgência", temperature AS "Temperatura", interest AS "Interesse", last_interaction_at AS "Última interação", next_action AS "Próxima ação", owner AS "Responsável", created_at AS "Data" FROM leads ORDER BY id DESC LIMIT 500')
+        if not leads.empty:
+            if filter_status != "Todos": leads = leads[leads["Status"] == filter_status]
+            if filter_channel != "Todos": leads = leads[leads["Canal"] == filter_channel]
+            if filter_urgency != "Todos": leads = leads[leads["Urgência"] == filter_urgency]
+            if filter_owner: leads = leads[leads["Responsável"].fillna("").str.contains(filter_owner, case=False, regex=False)]
+            if search_lead:
+                searchable = leads[["Nome", "Contato", "Instagram", "Próxima ação"]].fillna("").astype(str).agg(" ".join, axis=1)
+                leads = leads[searchable.str.contains(search_lead, case=False, regex=False)]
+        admin_table(leads, "Nenhum lead corresponde aos filtros.")
+        export_csv_button(leads, "realhype_leads.csv")
         if not leads.empty:
             lead_id = st.selectbox("Lead", leads["ID"].tolist(), format_func=lambda x: f"#{x} · {leads[leads.ID==x].iloc[0]['Nome']}")
             new_stage = st.selectbox("Novo status", ["lead", "prospect", "cliente", "perdido"])
@@ -642,7 +996,7 @@ elif page == "Leads / CRM":
             st.dataframe(msgs, width="stretch", hide_index=True)
 
 elif page == "Vendas":
-    st.markdown('<div class="rh-section">Comercial · pedidos e fulfillment</div>', unsafe_allow_html=True)
+    page_topbar("Vendas", "Pedidos, margem e baixa controlada de inventário.", "Nova venda")
     st.subheader("Registrar venda")
     leads = query_df("SELECT id, name FROM leads ORDER BY id DESC")
     products = query_df("SELECT id, sku, name, quantity, sale_price_eur, cost_brl FROM products WHERE active=1 ORDER BY name")
@@ -659,43 +1013,98 @@ elif page == "Vendas":
                 qty = sale_col1.number_input("Quantidade", min_value=1, step=1, value=1)
                 default_price = float(selected["sale_price_eur"] or 0)
                 unit_price = sale_col2.number_input("Preço unitário (€)", min_value=0.0, value=default_price, step=0.5)
-                status = sale_col1.selectbox("Status da venda", ["reservado", "confirmado", "enviado", "entregue", "devolvido"])
+                status = sale_col1.selectbox("Status da venda", ["reservado", "aguardando dados", "confirmado", "preparando envio", "enviado", "entregue", "devolvido", "cancelado"])
+                channel = sale_col2.selectbox("Canal", ["Instagram", "WhatsApp", "Outro"])
                 confirmation = sale_col2.selectbox("Confirmação", ["pendente", "confirmado_texto", "confirmado_audio"])
                 ctt = st.selectbox("Status logístico", ["pendente", "preparar", "enviado", "entregue", "devolvido"])
                 notes = st.text_area("Observações")
                 st.caption("O stock é reduzido automaticamente em vendas confirmadas, enviadas ou entregues.")
                 if st.form_submit_button("Registrar venda"):
                     try:
-                        order_id = create_order(None if lead_id is None else int(lead_id), int(product_id), int(qty), float(unit_price), status, confirmation, ctt, notes)
+                        order_id = create_order(None if lead_id is None else int(lead_id), int(product_id), int(qty), float(unit_price), status, confirmation, ctt, notes, channel)
+                        log_action("sale_created", "order", order_id, after_data=f"status={status}; qty={int(qty)}")
                         st.success(f"Venda registada. Pedido #{order_id}.")
                         st.rerun()
                     except Exception as e:
                         st.error(str(e))
     st.subheader("Últimas vendas")
     orders = query_df("""
-        SELECT o.id, l.name AS lead, o.status, o.confirmation_status, o.ctt_status, o.total_eur, o.total_brl, o.created_by, o.created_at
+        SELECT o.id AS pedido, COALESCE(l.name,'Sem cliente') AS cliente, p.name AS produto, oi.qty AS quantidade,
+               o.total_brl AS total_brl, o.status, (o.total_brl-(oi.qty*oi.unit_cost_brl)) AS margem_estimada_brl,
+               o.channel AS canal, o.created_at AS data
         FROM orders o
         LEFT JOIN leads l ON l.id = o.lead_id
+        JOIN order_items oi ON oi.order_id=o.id JOIN products p ON p.id=oi.product_id
         ORDER BY o.id DESC
         LIMIT 50
     """)
-    st.dataframe(orders, width="stretch", hide_index=True)
+    admin_table(orders, "Nenhuma venda registrada.")
+    export_csv_button(orders, "realhype_vendas.csv")
+
+elif page == "CTT / Pedidos":
+    page_topbar("CTT / Pedidos", "Validação de envio à cobrança e prevenção de devoluções.", "Atualizar pedido")
+    total_orders = safe_int(scalar("SELECT COUNT(*) FROM orders"))
+    awaiting = safe_int(scalar("SELECT COUNT(*) FROM orders WHERE confirmation_status='pendente' OR text_confirmed=0"))
+    sent = safe_int(scalar("SELECT COUNT(*) FROM orders WHERE ctt_status='enviado'"))
+    delivered = safe_int(scalar("SELECT COUNT(*) FROM orders WHERE ctt_status='entregue'"))
+    returned_count = safe_int(scalar("SELECT COUNT(*) FROM orders WHERE ctt_status='devolvido' OR returned=1"))
+    ctt_cost = safe_float(scalar("SELECT value FROM settings WHERE key='ctt_cost_brl'", default=0))
+    ctt_cards = st.columns(6)
+    for col,label,value in zip(ctt_cards,["Aguardando confirmação","Enviados","Entregues","Devolvidos","Taxa de devolução","Prejuízo estimado"],[awaiting,sent,delivered,returned_count,pct(returned_count/sent*100 if sent else 0),money_brl(returned_count*ctt_cost)]): col.metric(label,value)
+    orders_ctt = query_df('SELECT o.id AS "Pedido", COALESCE(l.name,\'Sem cliente\') AS "Cliente", o.status AS "Venda", o.ctt_status AS "CTT", o.text_confirmed AS "Texto OK", o.address_validated AS "Morada OK", o.phone_validated AS "Telefone OK", o.pickup_deadline AS "Prazo", o.returned AS "Devolvido", o.return_reason AS "Motivo", o.created_at AS "Data" FROM orders o LEFT JOIN leads l ON l.id=o.lead_id ORDER BY o.id DESC LIMIT 200')
+    admin_table(orders_ctt, "Nenhum pedido CTT registrado.")
+    if not orders_ctt.empty:
+        with st.expander("Atualizar validação CTT"):
+            with st.form("ctt_update_form"):
+                order_id = st.selectbox("Pedido", orders_ctt["Pedido"].tolist(), format_func=lambda value: f"Pedido #{value}")
+                c1,c2,c3 = st.columns(3)
+                text_ok = c1.checkbox("Confirmação textual recebida")
+                address_ok = c2.checkbox("Morada validada")
+                phone_ok = c3.checkbox("Telefone validado")
+                deadline = c1.date_input("Prazo de levantamento", value=date.today()+timedelta(days=7))
+                ctt_status = c2.selectbox("Status CTT", ["pendente","preparar","enviado","entregue","devolvido"])
+                returned_flag = c3.checkbox("Devolvido")
+                return_reason = st.text_input("Motivo da devolução")
+                ctt_notes = st.text_area("Observações")
+                if st.form_submit_button("Guardar validação CTT"):
+                    update_order_ctt(int(order_id),text_ok,address_ok,phone_ok,deadline,ctt_status,returned_flag,return_reason,ctt_notes)
+                    st.success("Pedido CTT atualizado.")
+                    st.rerun()
+    ctt_alerts = detect_alerts()
+    if not ctt_alerts.empty:
+        st.subheader("Alertas de risco")
+        admin_table(ctt_alerts[ctt_alerts["Entidade"].str.startswith("Pedido")])
 
 elif page == "Stock":
-    st.markdown('<div class="rh-section">Inventário · disponibilidade em tempo real</div>', unsafe_allow_html=True)
+    page_topbar("Stock", "Inventário, capital imobilizado e movimentos seguros.", "Movimento de stock")
     total_units = scalar("SELECT COALESCE(SUM(quantity),0) FROM products WHERE active=1")
     critical_products = scalar("SELECT COUNT(*) FROM products WHERE active=1 AND quantity <= reorder_point")
-    stock_col1, stock_col2 = st.columns(2)
-    stock_col1.metric("Total de unidades", int(total_units))
-    stock_col2.metric("Produtos críticos", int(critical_products), delta="reposição" if critical_products else "stock saudável", delta_color="inverse" if critical_products else "normal")
+    active_skus = scalar("SELECT COUNT(*) FROM products WHERE active=1")
+    zero_products = scalar("SELECT COUNT(*) FROM products WHERE active=1 AND quantity=0")
+    stock_value = scalar("SELECT COALESCE(SUM(quantity*cost_brl),0) FROM products WHERE active=1")
+    idle_capital = scalar("SELECT COALESCE(SUM(p.quantity*p.cost_brl),0) FROM products p WHERE p.active=1 AND NOT EXISTS (SELECT 1 FROM order_items oi WHERE oi.product_id=p.id)")
+    stock_cards = st.columns(6)
+    for col, label, value in zip(stock_cards, ["Unidades totais","SKUs ativos","Produtos críticos","Valor em stock","Produtos zerados","Capital parado"], [safe_int(total_units),safe_int(active_skus),safe_int(critical_products),money_brl(stock_value),safe_int(zero_products),money_brl(idle_capital)]): col.metric(label,value)
     tab1, tab2, tab3 = st.tabs(["Stock atual", "Movimento manual", "Histórico"])
     with tab1:
-        products = query_df("""
+        toolbar = st.columns([2,1,1])
+        stock_search = toolbar[0].text_input("Buscar SKU/produto", key="stock_search")
+        category_filter = toolbar[1].selectbox("Categoria", ["Todas"] + query_df("SELECT DISTINCT category FROM products WHERE category IS NOT NULL ORDER BY category")["category"].tolist(), key="stock_category")
+        status_filter = toolbar[2].selectbox("Status", ["Todos","OK","baixo","zerado"], key="stock_status")
+        products = query_df(f"""
             SELECT sku AS "SKU", name AS "Produto", category AS "Categoria", quantity AS "Unidades",
                    reorder_point AS "Mínimo",
-                   CASE WHEN quantity = 0 THEN 'zerado' WHEN quantity <= reorder_point THEN 'baixo' ELSE 'OK' END AS "Status"
+                   CASE WHEN quantity = 0 THEN 'zerado' WHEN quantity <= reorder_point THEN 'baixo' ELSE 'OK' END AS "Status",
+                   cost_brl AS "Custo BRL", sale_price_eur AS "Preço EUR",
+                   ((sale_price_eur*{get_eur_rate()})-cost_brl) AS "Margem est. BRL"
             FROM products WHERE active=1 ORDER BY quantity ASC, name
         """)
+        if not products.empty:
+            if stock_search:
+                mask = products[["SKU","Produto"]].fillna("").astype(str).agg(" ".join,axis=1).str.contains(stock_search,case=False,regex=False)
+                products = products[mask]
+            if category_filter != "Todas": products = products[products["Categoria"] == category_filter]
+            if status_filter != "Todos": products = products[products["Status"] == status_filter]
         if products.empty:
             st.info("Nenhum produto cadastrado.")
         else:
@@ -703,6 +1112,7 @@ elif page == "Stock":
                 colors = {"OK": "background-color: rgba(53,208,127,.10); color: #B7F7D2", "baixo": "background-color: rgba(212,175,55,.12); color: #F2D675", "zerado": "background-color: rgba(255,92,114,.12); color: #FF9AAA"}
                 return [colors.get(row["Status"], "") for _ in row]
             st.dataframe(products.style.apply(color_stock_row, axis=1), width="stretch", hide_index=True)
+        export_csv_button(products, "realhype_stock.csv")
     with tab2:
         stock_products = query_df("SELECT id, sku, name, quantity FROM products WHERE active=1 ORDER BY name")
         if stock_products.empty:
@@ -712,20 +1122,21 @@ elif page == "Stock":
                 with st.form("stock_movement_form"):
                     product_id = st.selectbox("Produto", stock_products["id"].tolist(), format_func=lambda x: f"{stock_products[stock_products.id==x].iloc[0]['sku']} · {stock_products[stock_products.id==x].iloc[0]['name']} · {stock_products[stock_products.id==x].iloc[0]['quantity']} un.")
                     move_col1, move_col2 = st.columns(2)
-                    movement_type = move_col1.selectbox("Movimento", ["entrada", "saida"], format_func=lambda value: "Entrada" if value == "entrada" else "Saída")
+                    movement_type = move_col1.selectbox("Movimento", ["entrada", "saida", "ajuste", "perda", "devolucao"], format_func=lambda value: value.replace("saida","saída").replace("devolucao","devolução").title())
                     move_qty = move_col2.number_input("Quantidade", min_value=1, step=1, value=1)
                     reason = st.text_input("Motivo", placeholder="Reposição, correção de inventário, avaria...")
+                    movement_notes = st.text_area("Observação")
                     if st.form_submit_button("Confirmar movimento"):
                         try:
-                            adjust_stock(int(product_id), movement_type, int(move_qty), reason)
+                            adjust_stock(int(product_id), movement_type, int(move_qty), reason, movement_notes)
                             st.success("Stock atualizado com segurança.")
                             st.rerun()
                         except Exception as e:
                             st.error(str(e))
     with tab3:
         movements = query_df("""
-            SELECT sm.created_at AS Data, p.sku AS SKU, p.name AS Produto, sm.movement_type AS Tipo,
-                   sm.qty AS Quantidade, sm.reason AS Motivo, sm.user_name AS Usuário
+            SELECT COALESCE(sm.movement_date,DATE(sm.created_at)) AS Data, p.sku AS SKU, p.name AS Produto, sm.movement_type AS Tipo,
+                   sm.qty AS Quantidade, sm.reason AS Motivo, sm.notes AS Observação, sm.user_name AS Responsável
             FROM stock_movements sm JOIN products p ON p.id=sm.product_id
             ORDER BY sm.id DESC LIMIT 100
         """)
@@ -735,11 +1146,9 @@ elif page == "Stock":
             st.dataframe(movements, width="stretch", hide_index=True)
 
 elif page == "Produtos":
-    if not IS_PARTNER:
-        st.warning("Área restrita ao perfil partner.")
-        st.stop()
-    st.markdown('<div class="rh-section">Catálogo · produtos e pricing</div>', unsafe_allow_html=True)
-    catalog = query_df("SELECT sku AS SKU, name AS Produto, category AS Categoria, quantity AS Stock, reorder_point AS Mínimo, cost_brl AS Custo_BRL, sale_price_eur AS Preço_EUR, active AS Ativo FROM products ORDER BY name")
+    require_role("partner")
+    page_topbar("Produtos", "Cadastro estruturado de SKUs, pricing e garantia.", "Novo produto")
+    catalog = query_df('SELECT sku AS "SKU", name AS "Produto", category AS "Categoria", quantity AS "Stock", reorder_point AS "Mínimo", cost_brl AS "Custo BRL", sale_price_eur AS "Preço venda", currency AS "Moeda", active AS "Ativo", tags AS "Tags" FROM products ORDER BY name')
     if catalog.empty:
         st.info("Nenhum produto cadastrado.")
     else:
@@ -754,41 +1163,68 @@ elif page == "Produtos":
             reorder = prod_col1.number_input("Ponto de reposição", min_value=0, step=1, value=1)
             cost = prod_col2.number_input("Custo unitário (BRL)", min_value=0.0, value=0.0, step=1.0)
             price = prod_col1.number_input("Preço de venda (€)", min_value=0.0, value=0.0, step=0.5)
+            currency = prod_col2.selectbox("Moeda", ["EUR", "BRL"])
+            active = prod_col1.checkbox("Produto ativo", value=True)
+            tags = prod_col2.text_input("Tags", placeholder="masculino, premium, corrente")
+            description = st.text_area("Descrição curta")
+            warranty = st.text_area("Garantia / observações")
             if st.form_submit_button("Guardar produto"):
                 if sku.strip() and name.strip():
-                    add_product(sku.strip().upper(), name.strip(), category, int(qty), int(reorder), float(cost), float(price))
+                    add_product(sku.strip().upper(), name.strip(), category, int(qty), int(reorder), float(cost), float(price), currency, description.strip(), tags.strip(), warranty.strip(), int(active))
                     st.success("Produto guardado.")
                     st.rerun()
                 else:
                     st.error("SKU e nome são obrigatórios.")
 
 elif page == "Financeiro":
-    if not IS_PARTNER:
-        st.warning("Área restrita ao perfil partner.")
-        st.stop()
-    st.markdown('<div class="rh-section">Financeiro · leitura estimada da operação</div>', unsafe_allow_html=True)
-    revenue_eur = scalar("SELECT COALESCE(SUM(total_eur),0) FROM orders WHERE status IN ('confirmado','enviado','entregue')")
-    revenue_brl = scalar("SELECT COALESCE(SUM(total_brl),0) FROM orders WHERE status IN ('confirmado','enviado','entregue')")
-    cost_brl = scalar("SELECT COALESCE(SUM(oi.qty * oi.unit_cost_brl),0) FROM order_items oi JOIN orders o ON o.id=oi.order_id WHERE o.status IN ('confirmado','enviado','entregue')")
+    require_role("partner")
+    page_topbar("Financeiro", "Controladoria simples, margem e inteligência de receita.", "Exportar relatório")
+    metrics = calculate_metrics()
+    revenue_brl, cost_brl = metrics["revenue"], metrics["cmv"]
+    today_clause = "DATE(created_at)=CURRENT_DATE" if not get_db_url().startswith("sqlite") else "DATE(created_at)=DATE('now')"
+    revenue_today = scalar(f"SELECT COALESCE(SUM(total_brl),0) FROM orders WHERE {today_clause} AND status IN ('confirmado','preparando envio','enviado','entregue')")
     expenses_brl = scalar("SELECT COALESCE(SUM(amount_brl),0) FROM expenses")
-    col1, col2, col3, col4 = st.columns(4)
-    col1.metric("Faturamento total", money_brl(revenue_brl), delta=money_eur(revenue_eur), delta_color="off")
-    col2.metric("Custo estimado", money_brl(cost_brl), help="Custo dos produtos vendidos")
-    col3.metric("Lucro bruto estimado", money_brl(float(revenue_brl) - float(cost_brl)), help="Receita menos custo dos produtos vendidos")
-    col4.metric("Despesas lançadas", money_brl(expenses_brl))
-    st.caption("Indicadores estimados: lucro bruto = receita de vendas efetivas − custo dos produtos vendidos. Não substitui apuração contabilística.")
+    return_cost = safe_int(scalar("SELECT COUNT(*) FROM orders WHERE status='devolvido' OR returned=1")) * safe_float(scalar("SELECT value FROM settings WHERE key='ctt_cost_brl'", default=0))
+    finance_cols = st.columns(4); finance_cols2 = st.columns(3)
+    for col,label,value in zip(finance_cols,["Receita total","Receita hoje","CMV estimado","Lucro estimado"],[money_brl(revenue_brl),money_brl(revenue_today),money_brl(cost_brl),money_brl(metrics["profit"])]): col.metric(label,value)
+    for col,label,value in zip(finance_cols2,["Margem estimada","Ticket médio","Custo devoluções est."],[pct(metrics["margin"]),money_brl(metrics["ticket"]),money_brl(return_cost)]): col.metric(label,value)
+    st.warning("Lucro estimado até confirmar custos finais de CTT, embalagem e ads.")
 
     st.subheader("Vendas consideradas")
     financial_sales = query_df("""
         SELECT o.id AS Pedido, COALESCE(l.name, 'Sem cliente') AS Cliente, o.status AS Status,
                o.total_eur AS Total_EUR, o.total_brl AS Total_BRL, o.created_at AS Data
         FROM orders o LEFT JOIN leads l ON l.id=o.lead_id
-        WHERE o.status IN ('confirmado','enviado','entregue') ORDER BY o.id DESC
+        WHERE o.status IN ('confirmado','preparando envio','enviado','entregue') ORDER BY o.id DESC
     """)
     if financial_sales.empty:
         st.info("Ainda não há vendas efetivas para o resumo financeiro.")
     else:
         st.dataframe(financial_sales, width="stretch", hide_index=True)
+    export_csv_button(financial_sales, "realhype_financeiro.csv", "Exportar relatório CSV")
+
+    chart1, chart2 = st.columns(2)
+    with chart1:
+        st.subheader("Receita por período")
+        daily_finance = query_df("SELECT created_at,total_brl FROM orders WHERE status IN ('confirmado','preparando envio','enviado','entregue') ORDER BY created_at")
+        if daily_finance.empty: empty_state("Sem série histórica", "Registre vendas válidas para formar a curva de receita.")
+        else:
+            daily_finance["created_at"] = pd.to_datetime(daily_finance["created_at"],errors="coerce")
+            daily_chart = daily_finance.dropna().groupby(daily_finance["created_at"].dt.date)["total_brl"].sum()
+            st.line_chart(daily_chart,color="#D6B25E")
+    with chart2:
+        st.subheader("Vendas por canal")
+        channels = query_df("SELECT channel,COUNT(*) AS vendas FROM orders WHERE status IN ('confirmado','preparando envio','enviado','entregue') GROUP BY channel")
+        if channels.empty: empty_state("Sem atribuição", "As vendas por canal aparecerão aqui.")
+        else: st.bar_chart(channels.set_index("channel"),color="#22D3EE")
+
+    with st.expander("BI avançado · ABC, heatmap, cohort e forecast"):
+        abc = classify_products_abc(); heatmap = build_heatmap_data(); cohort = build_cohort_data(); forecast = forecast_revenue_30d()
+        st.metric("Forecast simples · 30 dias", money_brl(forecast["forecast_30d"]), help="Média diária dos últimos dias × 30")
+        bi1,bi2,bi3 = st.tabs(["Pareto / ABC","Dia e hora","Cohort"])
+        with bi1: admin_table(abc, "Ainda não há receita suficiente para classificar produtos.")
+        with bi2: admin_table(heatmap.reset_index() if not heatmap.empty else heatmap, "Ainda não há datas suficientes para o heatmap.")
+        with bi3: admin_table(cohort, "Ainda não há compras associadas a clientes para cohort.")
 
     st.subheader("Lançar despesa")
     with st.form("expense_form"):
@@ -798,22 +1234,87 @@ elif page == "Financeiro":
         notes = st.text_area("Notas")
         if st.form_submit_button("Guardar despesa"):
             execute("INSERT INTO expenses (expense_date, category, amount_brl, notes) VALUES (:d, :c, :a, :n)", {"d": str(exp_date), "c": category, "a": float(amount), "n": notes})
+            log_action("expense_created", "expense", after_data=f"category={category}; amount={float(amount):.2f}")
             st.success("Despesa registada.")
             st.rerun()
     expenses = query_df("SELECT expense_date, category, amount_brl, notes, created_at FROM expenses ORDER BY id DESC LIMIT 50")
     st.dataframe(expenses, width="stretch", hide_index=True)
 
+elif page == "Growth":
+    require_role("partner")
+    page_topbar("Growth", "Campanhas, criativos e conversão chat → pedido.", "Registrar campanha")
+    campaigns = query_df("SELECT * FROM campaign_metrics ORDER BY metric_date DESC,id DESC LIMIT 300")
+    if campaigns.empty:
+        empty_state("Sem métricas de campanha", "Registre dados agregados; nenhum dado real é inventado automaticamente.")
+    else:
+        campaigns["custo_por_mensagem"] = campaigns.apply(lambda row: safe_float(row["investment_brl"])/safe_int(row["messages_received"]) if safe_int(row["messages_received"]) else 0,axis=1)
+        campaigns["conversao_chat_pedido_pct"] = campaigns.apply(lambda row: safe_int(row["sales_count"])/safe_int(row["messages_received"])*100 if safe_int(row["messages_received"]) else 0,axis=1)
+        campaigns["roas_estimado"] = campaigns.apply(lambda row: safe_float(row["revenue_brl"])/safe_float(row["investment_brl"]) if safe_float(row["investment_brl"]) else 0,axis=1)
+        gcols=st.columns(4)
+        winner=campaigns.sort_values("roas_estimado",ascending=False).iloc[0]
+        gcols[0].metric("Criativo vencedor", str(winner.get("creative") or "—"),delta=f"ROAS {safe_float(winner['roas_estimado']):.2f}x")
+        gcols[1].metric("Custo por mensagem", money_brl(campaigns["investment_brl"].sum()/campaigns["messages_received"].sum() if campaigns["messages_received"].sum() else 0))
+        gcols[2].metric("Vendas atribuídas", safe_int(campaigns["sales_count"].sum()))
+        gcols[3].metric("Receita estimada", money_brl(campaigns["revenue_brl"].sum()))
+        admin_table(campaigns[["metric_date","campaign","creative","channel","investment_brl","messages_received","leads_count","sales_count","custo_por_mensagem","conversao_chat_pedido_pct","revenue_brl","roas_estimado","notes"]])
+        export_csv_button(campaigns,"realhype_growth.csv")
+    with st.expander("Registrar métricas de campanha",expanded=campaigns.empty):
+        with st.form("campaign_form"):
+            g1,g2,g3=st.columns(3)
+            campaign=g1.text_input("Campanha"); creative=g2.text_input("Criativo"); growth_channel=g3.selectbox("Canal",["Instagram","WhatsApp","Meta Ads","Outro"])
+            investment=g1.number_input("Investimento (BRL)",min_value=0.0); messages=g2.number_input("Mensagens recebidas",min_value=0,step=1); leads_count=g3.number_input("Leads",min_value=0,step=1)
+            sales_count=g1.number_input("Vendas",min_value=0,step=1); attributed_revenue=g2.number_input("Receita estimada (BRL)",min_value=0.0); metric_date=g3.date_input("Data",value=date.today())
+            growth_notes=st.text_area("Observações")
+            if st.form_submit_button("Guardar métricas"):
+                if not campaign.strip(): st.error("Informe o nome da campanha.")
+                else:
+                    execute("INSERT INTO campaign_metrics (campaign,creative,channel,investment_brl,messages_received,leads_count,sales_count,revenue_brl,notes,metric_date) VALUES (:campaign,:creative,:channel,:investment,:messages,:leads,:sales,:revenue,:notes,:metric_date)",{"campaign":campaign.strip(),"creative":creative.strip(),"channel":growth_channel,"investment":float(investment),"messages":int(messages),"leads":int(leads_count),"sales":int(sales_count),"revenue":float(attributed_revenue),"notes":growth_notes.strip(),"metric_date":str(metric_date)})
+                    log_action("campaign_metrics_created","campaign",after_data=f"campaign={campaign.strip()}")
+                    st.success("Métricas registradas."); st.rerun()
+
+elif page == "Alertas":
+    require_role("partner","sdr")
+    page_topbar("Alertas", "Exceções operacionais e ações recomendadas.", "Resolver prioridades")
+    alerts = detect_alerts()
+    if alerts.empty:
+        empty_state("Nenhum alerta ativo", "Stock, confirmações e devoluções estão dentro das regras monitoradas.")
+    else:
+        alert_filter=st.selectbox("Severidade",["Todas","info","atenção","crítico"])
+        if alert_filter!="Todas": alerts=alerts[alerts["Severidade"]==alert_filter]
+        admin_table(alerts,"Nenhum alerta nesta severidade.")
+        export_csv_button(alerts,"realhype_alertas.csv")
+    with st.expander("Regras monitoradas"):
+        st.markdown("Stock crítico · produto zerado · pedido sem confirmação · devolução CTT. Anomalia de receita, queda de conversão, produto parado e margem baixa usam estrutura de BI e serão refinados conforme a série histórica crescer.")
+
 elif page == "Configurações":
-    if not IS_PARTNER:
-        st.warning("Área restrita ao perfil partner.")
-        st.stop()
-    st.markdown('<div class="rh-section">Administração · parâmetros operacionais</div>', unsafe_allow_html=True)
+    require_role("partner")
+    page_topbar("Configurações", "Parâmetros operacionais e governança do Command OS.", "Salvar parâmetros")
     current_rate = get_eur_rate()
-    rate = st.number_input("Cotação EUR → BRL", min_value=0.0, value=float(current_rate), step=0.01)
-    if st.button("Salvar cotação"):
-        execute("UPDATE settings SET value=:v WHERE key='eur_brl'", {"v": str(rate)})
-        st.success("Cotação atualizada.")
-        st.rerun()
+    setting_values = {row["key"]:row["value"] for _,row in query_df("SELECT key,value FROM settings").iterrows()}
+    status_cols=st.columns(4)
+    status_cols[0].metric("Conexão","Neon / PostgreSQL" if not get_db_url().startswith("sqlite") else "SQLite local")
+    status_cols[1].metric("Ambiente","Streamlit Cloud" if not get_db_url().startswith("sqlite") else "Local")
+    status_cols[2].metric("Versão",setting_values.get("app_version","2026.1"))
+    status_cols[3].metric("Timezone","America/Sao_Paulo")
+    with st.form("settings_form"):
+        s1,s2,s3=st.columns(3)
+        rate=s1.number_input("Cotação EUR → BRL",min_value=0.0,value=float(current_rate),step=0.01)
+        packaging=s2.number_input("Custo padrão embalagem (BRL)",min_value=0.0,value=safe_float(setting_values.get("packaging_cost_brl")),step=1.0)
+        ctt_setting=s3.number_input("Custo estimado CTT (BRL)",min_value=0.0,value=safe_float(setting_values.get("ctt_cost_brl")),step=1.0)
+        daily_goal=s1.number_input("Meta diária de receita (BRL)",min_value=0.0,value=safe_float(setting_values.get("daily_revenue_goal_brl")),step=10.0)
+        monthly_goal=s2.number_input("Meta mensal de vendas",min_value=0,value=safe_int(setting_values.get("monthly_sales_goal")),step=1)
+        default_currency=s3.selectbox("Moeda padrão",["BRL","EUR"],index=0 if setting_values.get("default_currency","BRL")=="BRL" else 1)
+        if st.form_submit_button("Salvar parâmetros"):
+            values={"eur_brl":rate,"packaging_cost_brl":packaging,"ctt_cost_brl":ctt_setting,"daily_revenue_goal_brl":daily_goal,"monthly_sales_goal":monthly_goal,"default_currency":default_currency}
+            for key,value in values.items(): execute("UPDATE settings SET value=:value WHERE key=:key",{"value":str(value),"key":key})
+            log_action("settings_updated","settings")
+            st.success("Parâmetros atualizados."); st.rerun()
+    st.subheader("Usuários e roles")
+    safe_users=pd.DataFrame([{"Usuário":username,"Nome":data.get("name",username),"Role":data.get("role","sdr")} for username,data in get_users().items()])
+    admin_table(safe_users,"Nenhum usuário configurado em Secrets.")
+    st.subheader("Audit log")
+    audit=query_df('SELECT created_at AS "Data",actor AS "Ator",role AS "Role",action AS "Ação",entity_type AS "Entidade",entity_id AS "ID" FROM audit_logs ORDER BY id DESC LIMIT 100')
+    admin_table(audit,"Nenhuma ação auditada ainda.")
     st.markdown("""
     <div class="rh-alert">
       <b>Segurança:</b> no Streamlit Cloud, mantenha utilizadores, senhas e banco apenas em <code>Secrets</code>.
