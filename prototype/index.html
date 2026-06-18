@@ -1,28 +1,97 @@
 <!doctype html>
-<html lang="pt-BR">
+<html lang="pt-PT">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>RealHype Command OS 2026 — DEMO</title>
-  <link rel="stylesheet" href="styles.css">
+  <meta name="theme-color" content="#090b10">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; font-src 'self'; object-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'">
+  <title>REALHYPE COMMAND OS 2026 — DEMO</title>
+  <link rel="stylesheet" href="app.css">
+  <script src="app.js" defer></script>
 </head>
 <body>
-  <aside>
-    <div class="brand">REALHYPE<br><span>COMMAND OS</span></div>
-    <div class="live">● LIVE OPS · DEMO</div>
-    <nav id="nav"></nav>
-    <footer>Banco desconectado<br>Protótipo visual v2026</footer>
-  </aside>
-  <main>
-    <header><div><h1>Command Center</h1><p>Decisões prioritárias da operação.</p></div><input aria-label="Busca global" placeholder="Buscar lead, pedido ou SKU"><button>Atualizar</button></header>
-    <div class="demo">DEMO VISUAL · DADOS FICTÍCIOS · SEM CONEXÃO AO NEON</div>
-    <section class="metrics" id="metrics"></section>
-    <section class="grid">
-      <article><h2>Ações recomendadas</h2><div id="actions"></div></article>
-      <article><h2>Atividade recente</h2><div id="activity"></div></article>
-    </section>
-    <article><h2>Operação</h2><div class="table-wrap"><table><thead><tr><th>Entidade</th><th>Status</th><th>Responsável</th><th>Próxima ação</th></tr></thead><tbody id="rows"></tbody></table></div></article>
-  </main>
-  <script src="app.js"></script>
+  <a class="skip-link" href="#main-content">Ir para o conteúdo</a>
+  <div class="app-shell" id="app-shell">
+    <aside class="sidebar" id="sidebar" aria-label="Navegação principal">
+      <div class="brand-row">
+        <button class="icon-button mobile-only" id="close-sidebar" aria-label="Fechar menu">×</button>
+        <div class="brand-mark" aria-hidden="true">RH</div>
+        <div class="brand-copy"><strong>REALHYPE</strong><span>COMMAND OS 2026</span></div>
+      </div>
+      <div class="live-badge"><span aria-hidden="true"></span> LIVE OPS · DEMO</div>
+      <div class="user-card">
+        <div class="avatar" aria-hidden="true">FM</div>
+        <div><strong>Operador Demo</strong><span id="role-label">War Room</span></div>
+      </div>
+      <nav class="nav-list" id="main-nav"></nav>
+      <div class="sidebar-footer">
+        <div><span class="status-dot" aria-hidden="true"></span> Data service mock</div>
+        <span id="sidebar-updated">Atualizado agora</span>
+        <span>v2026.1 · DEMO</span>
+      </div>
+    </aside>
+
+    <div class="workspace">
+      <header class="topbar">
+        <button class="icon-button" id="toggle-sidebar" aria-label="Alternar menu lateral" aria-expanded="true">☰</button>
+        <div class="page-heading"><h1 id="page-title">War Room</h1><p id="page-subtitle">Pergunta → Insight → Ação</p></div>
+        <button class="global-search" id="open-command" aria-label="Abrir busca e comandos"><span>Buscar ou executar</span><kbd>Ctrl K</kbd></button>
+        <label class="role-switcher">Modo
+          <select id="role-select" aria-label="Selecionar modo de demonstração">
+            <option value="partner">Sócios</option>
+            <option value="sdr">SDR</option>
+            <option value="ops">Operação</option>
+            <option value="bi">BI</option>
+          </select>
+        </label>
+        <div class="clock" id="clock" aria-label="Horário de Brasília"></div>
+        <button class="primary-button" id="primary-action">Criar pedido</button>
+      </header>
+
+      <section class="filterbar" aria-label="Filtros globais">
+        <button class="icon-button mobile-only" id="open-sidebar" aria-label="Abrir menu">☰</button>
+        <label>Período<select id="filter-period"><option value="7">7 dias</option><option value="30" selected>30 dias</option><option value="90">90 dias</option><option value="365">12 meses</option></select></label>
+        <label>Unidade<select id="filter-unit"><option>RealHype PT</option><option>Lisboa</option><option>Porto</option></select></label>
+        <label>Canal<select id="filter-channel"><option value="all">Todos</option><option>Instagram DM</option><option>WhatsApp</option><option>Orgânico</option></select></label>
+        <label>Categoria<select id="filter-category"><option value="all">Todas</option><option>Correntes</option><option>Pulseiras</option><option>Pendentes</option><option>Anéis</option></select></label>
+        <label id="owner-filter-wrap">Dono (SDR)<select id="filter-owner"><option value="all">Todos</option><option>Ana</option><option>Bruno</option><option>Carla</option></select></label>
+        <label>Estado pedido<select id="filter-status"><option value="all">Todos</option><option>confirmado</option><option>preparação</option><option>enviado</option><option>entregue</option><option>devolvido</option></select></label>
+        <label>Fuso horário<select id="filter-timezone"><option value="Europe/Lisbon">Europe/Lisbon</option><option value="America/Sao_Paulo">America/Sao_Paulo</option></select></label>
+        <button class="text-button" id="reset-filters">Limpar</button>
+        <span class="last-update" id="last-update">Atualizado agora</span>
+      </section>
+
+      <div class="demo-banner" role="status"><strong>AMBIENTE DEMO</strong><span>Dados fictícios IG + CTT Portugal. Sem ligação a sistemas externos.</span></div>
+
+      <main id="main-content" tabindex="-1">
+        <div class="skeleton-grid" id="loading-state" aria-label="Carregando painel">
+          <div></div><div></div><div></div><div></div>
+        </div>
+        <div id="page-content" aria-live="polite"></div>
+      </main>
+    </div>
+  </div>
+
+  <dialog class="command-dialog" id="command-dialog" aria-labelledby="command-title">
+    <div class="command-head"><h2 id="command-title">Command Palette</h2><kbd>ESC</kbd></div>
+    <label class="sr-only" for="command-input">Buscar comando</label>
+    <input id="command-input" autocomplete="off" placeholder="Introduza uma ação ou ID…">
+    <div class="command-results" id="command-results" role="listbox"></div>
+  </dialog>
+
+  <dialog class="drawer" id="detail-drawer" aria-labelledby="drawer-title">
+    <div class="drawer-head"><div><span class="eyebrow">DRILL-DOWN</span><h2 id="drawer-title">Detalhes</h2></div><button class="icon-button" id="close-drawer" aria-label="Fechar detalhes">×</button></div>
+    <div id="drawer-content"></div>
+  </dialog>
+
+  <dialog class="action-dialog" id="action-dialog" aria-labelledby="action-title">
+    <form method="dialog" id="action-form">
+      <div class="drawer-head"><div><span class="eyebrow">AÇÃO RÁPIDA</span><h2 id="action-title">Criar pedido</h2></div><button class="icon-button" value="cancel" aria-label="Cancelar">×</button></div>
+      <div id="action-fields"></div>
+      <div class="form-actions"><button class="secondary-button" value="cancel">Cancelar</button><button class="primary-button" id="confirm-action" value="default">Confirmar ação</button></div>
+    </form>
+  </dialog>
+
+  <div class="toast-region" id="toast-region" aria-live="assertive" aria-atomic="true"></div>
 </body>
 </html>

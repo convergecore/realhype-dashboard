@@ -55,7 +55,13 @@ As permissões são verificadas no app antes de ações sensíveis; ocultar um m
 
 ## Protótipo visual
 
-`prototype/` contém um mock HTML/CSS/JS isolado, explicitamente marcado como DEMO. Ele usa apenas dados fictícios, não acessa Secrets e não conecta ao Neon.
+`prototype/` contém o MVP frontend “Direct Commerce Intelligence Platform”, explicitamente marcado como DEMO. Usa pt-PT, EUR, `Europe/Lisbon` e dados fictícios sazonais de Instagram DM + CTT Portugal; não acede a Secrets nem liga ao Neon.
+
+```bash
+python -m http.server 8765 --directory prototype
+```
+
+Abra `http://127.0.0.1:8765`. A arquitetura, modelo de dados, RBAC, endpoints, glossário, segurança, performance e roadmap estão em `prototype/ARCHITECTURE.md`.
 
 ## Roadmap
 
